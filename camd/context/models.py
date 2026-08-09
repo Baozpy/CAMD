@@ -14,3 +14,12 @@ class DefectPrediction:
     location: DefectLocation
     explanation: str
     confidence: float
+
+
+@dataclass
+class DefectSample:
+    sample_id: str
+    file: str
+    label: bool
+    defect_type: str
+    buggy_line: int
