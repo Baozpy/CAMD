@@ -57,6 +57,15 @@ def parse_args():
             "rerunning the experiment."
         ),
     )
+    parser.add_argument(
+        "--multi-agent-only",
+        action="store_true",
+        help=(
+            "Reuse existing B4 ranking and "
+            "rerun only CAMD Multi-Agent "
+            "verification."
+        ),
+    )
 
     return parser.parse_args()
 
@@ -248,11 +257,63 @@ def main():
     args = parse_args()
 
     summaries = []
+    multi_agent_comparisons = []    
 
     for bug_id in range(
         args.bug_start,
         args.bug_end + 1,
     ):
+
+        # =================================================
+        # Multi-Agent only mode
+        # =================================================
+
+        if args.multi_agent_only:
+
+            try:
+
+                runner = (
+                    Defects4JExperimentRunner(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        project=args.project,
+                        bug_id=bug_id,
+                        top_k=args.top_k,
+                    )
+                )
+
+                # runner.run_multi_agent_only()
+                comparison = (
+                    runner.run_multi_agent_only()
+                )
+
+                multi_agent_comparisons.append(
+                    comparison
+                )
+
+            except Exception as exc:
+
+                print()
+                print("=" * 100)
+
+                print(
+                    f"FAILED: "
+                    f"{args.project}-"
+                    f"{bug_id}"
+                )
+
+                print(
+                    str(exc)
+                )
+
+                print("=" * 100)
+
+            continue
+
+        # =================================================
+        # Normal skip-existing mode
+        # =================================================
 
         if args.skip_existing:
 
@@ -289,6 +350,10 @@ def main():
 
                 continue
 
+        # =================================================
+        # Full experiment mode
+        # =================================================
+
         try:
 
             runner = (
@@ -313,9 +378,7 @@ def main():
         except Exception as exc:
 
             print()
-            print(
-                "=" * 100
-            )
+            print("=" * 100)
 
             print(
                 f"FAILED: "
@@ -327,9 +390,192 @@ def main():
                 str(exc)
             )
 
+            print("=" * 100)
+
+    # =====================================================
+    # Multi-Agent-only runs already save their own results.
+    # Do not create the normal aggregate summary.
+    # =====================================================
+
+    if args.multi_agent_only:
+
+        if not multi_agent_comparisons:
+
             print(
-                "=" * 100
+                "No multi-agent-only "
+                "experiments completed."
             )
+
+            return
+
+        total = len(
+            multi_agent_comparisons
+        )
+
+        rr_values = [
+            item[
+                "expanded_test_context"
+            ]["rr"]
+            for item
+            in multi_agent_comparisons
+        ]
+
+        top_1_values = [
+            item[
+                "expanded_test_context"
+            ]["top_1"]
+            for item
+            in multi_agent_comparisons
+        ]
+
+        top_3_values = [
+            item[
+                "expanded_test_context"
+            ]["top_3"]
+            for item
+            in multi_agent_comparisons
+        ]
+
+        top_5_values = [
+            item[
+                "expanded_test_context"
+            ]["top_5"]
+            for item
+            in multi_agent_comparisons
+        ]
+
+        aggregate = {
+            "evaluated_bugs": total,
+
+            "bugs": [
+                item["bug_id"]
+                for item
+                in multi_agent_comparisons
+            ],
+
+            "mrr": (
+                sum(rr_values)
+                / total
+            ),
+
+            "top_1_accuracy": (
+                sum(top_1_values)
+                / total
+            ),
+
+            "top_3_accuracy": (
+                sum(top_3_values)
+                / total
+            ),
+
+            "top_5_accuracy": (
+                sum(top_5_values)
+                / total
+            ),
+        }
+
+        output_file = (
+            PROJECT_ROOT
+            / "results"
+            / "defects4j"
+            / (
+                f"{args.project}_"
+                f"{args.bug_start}_"
+                f"{args.bug_end}_"
+                f"expanded_test_summary.json"
+            )
+        )
+
+        output_file.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        with output_file.open(
+            "w",
+            encoding="utf-8",
+        ) as file:
+
+            json.dump(
+                {
+                    "project": (
+                        args.project
+                    ),
+
+                    "bug_start": (
+                        args.bug_start
+                    ),
+
+                    "bug_end": (
+                        args.bug_end
+                    ),
+
+                    "mode": (
+                        "multi_agent_only_"
+                        "expanded_test"
+                    ),
+
+                    "per_bug": (
+                        multi_agent_comparisons
+                    ),
+
+                    "aggregate": (
+                        aggregate
+                    ),
+                },
+                file,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        print()
+        print("=" * 100)
+
+        print(
+            "Expanded-Test "
+            "CAMD Aggregate Results"
+        )
+
+        print("=" * 100)
+
+        print(
+            f"Evaluated bugs: "
+            f"{aggregate['evaluated_bugs']}"
+        )
+
+        print(
+            f"MRR: "
+            f"{aggregate['mrr']:.4f}"
+        )
+
+        print(
+            f"Top-1: "
+            f"{aggregate['top_1_accuracy']:.4f}"
+        )
+
+        print(
+            f"Top-3: "
+            f"{aggregate['top_3_accuracy']:.4f}"
+        )
+
+        print(
+            f"Top-5: "
+            f"{aggregate['top_5_accuracy']:.4f}"
+        )
+
+        print()
+
+        print(
+            f"Expanded-test summary "
+            f"saved to:\n"
+            f"{output_file}"
+        )
+
+        return
+
+    # =====================================================
+    # Aggregate normal / skip-existing experiments
+    # =====================================================
 
     aggregate = (
         aggregate_summaries(
@@ -385,6 +631,10 @@ def main():
                     args.skip_existing
                 ),
 
+                "multi_agent_only": (
+                    args.multi_agent_only
+                ),
+
                 "per_bug": (
                     summaries
                 ),
@@ -406,7 +656,6 @@ def main():
         f"Summary saved to:\n"
         f"{output_file}"
     )
-
 
 if __name__ == "__main__":
     main()

@@ -39,7 +39,11 @@ from camd.static.ast_analyzer import (
 from camd.static.evidence_builder import (
     StaticEvidenceBuilder,
 )
+from camd.evaluation.test_context_builder import (
+    TestContextBuilder,
+)
 
+from types import SimpleNamespace
 
 class Defects4JExperimentRunner:
 
@@ -505,13 +509,19 @@ class Defects4JExperimentRunner:
         self,
     ) -> tuple[str, list[str]]:
 
-        extractor = (
+        failing_extractor = (
             FailingTestExtractor(
                 checkout_dir=self.buggy_dir
             )
         )
 
-        tests = extractor.extract()
+        tests = (
+            failing_extractor.extract()
+        )
+
+        context_builder = (
+            TestContextBuilder()
+        )
 
         output = []
         names = []
@@ -523,31 +533,71 @@ class Defects4JExperimentRunner:
             )
 
             output.append(
-                f"Test: {test.full_name}"
+                f"Failing test: "
+                f"{test.full_name}"
             )
 
+            output.append("")
+
+            expanded_successfully = False
+
             if (
-                test.start_line is not None
-                and test.end_line is not None
+                test.source_file is not None
+                and test.method_name
+            ):
+
+                try:
+
+                    expanded = (
+                        context_builder.build(
+                            source_file=(
+                                test.source_file
+                            ),
+                            test_method_name=(
+                                test.method_name
+                            ),
+                        )
+                    )
+
+                    output.append(
+                        expanded.to_text()
+                    )
+
+                    expanded_successfully = True
+
+                except ValueError:
+
+                    pass
+
+            if (
+                not expanded_successfully
             ):
 
                 output.append(
-                    f"Lines: "
-                    f"{test.start_line}-"
-                    f"{test.end_line}"
+                    "FAILING TEST"
                 )
 
-            output.append("")
-
-            if test.code:
                 output.append(
-                    test.code
+                    "=" * 70
                 )
+
+                if test.code:
+
+                    output.append(
+                        test.code
+                    )
+
+                else:
+
+                    output.append(
+                        "Source code unavailable."
+                    )
 
             output.append("")
             output.append(
-                "=" * 70
+                "=" * 90
             )
+            output.append("")
 
         return (
             "\n".join(output),
@@ -829,6 +879,502 @@ STATIC EVIDENCE
 
         return results
 
+
+    def load_existing_b4_results(
+        self,
+    ):
+        path = (
+            self.result_dir
+            / "b4_static_ranking.jsonl"
+        )
+
+        if not path.exists():
+            raise FileNotFoundError(
+                f"B4 result file not found:\n"
+                f"{path}"
+            )
+
+        results = []
+
+        with path.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+
+            for line in file:
+
+                if not line.strip():
+                    continue
+
+                record = json.loads(
+                    line
+                )
+
+                results.append(
+                    SimpleNamespace(
+                        method_name=(
+                            record["method"]
+                        ),
+                        start_line=(
+                            record["start_line"]
+                        ),
+                        end_line=(
+                            record["end_line"]
+                        ),
+                        suspicion_score=(
+                            record[
+                                "suspicion_score"
+                            ]
+                        ),
+                        is_suspicious=(
+                            record.get(
+                                "is_suspicious",
+                                False,
+                            )
+                        ),
+                        defect_type=(
+                            record.get(
+                                "defect_type",
+                                "none",
+                            )
+                        ),
+                        reason=(
+                            record.get(
+                                "reason",
+                                "",
+                            )
+                        ),
+                    )
+                )
+
+        results.sort(
+            key=lambda item: (
+                item.suspicion_score
+            ),
+            reverse=True,
+        )
+
+        return results
+
+    def load_existing_summary(
+        self,
+    ) -> dict:
+
+        path = (
+            self.result_dir
+            / "summary.json"
+        )
+
+        if not path.exists():
+
+            raise FileNotFoundError(
+                f"Existing summary not found:\n"
+                f"{path}"
+            )
+
+        with path.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+
+            return json.load(
+                file
+            )
+
+    def extract_candidate_methods(
+        self,
+        modified_classes: list[str],
+    ) -> list[JavaMethod]:
+
+        methods = []
+
+        for class_name in modified_classes:
+
+            source_file = (
+                self.class_to_source_file(
+                    checkout_dir=(
+                        self.buggy_dir
+                    ),
+                    class_name=class_name,
+                )
+            )
+
+            if not source_file.exists():
+
+                print(
+                    f"Skipping missing source: "
+                    f"{source_file}"
+                )
+
+                continue
+
+            methods.extend(
+                extract_java_methods(
+                    source_file
+                )
+            )
+
+        return methods
+
+    def run_multi_agent_only(
+        self,
+    ) -> dict:
+
+        print()
+        print("=" * 100)
+
+        print(
+            f"CAMD Multi-Agent Only: "
+            f"{self.project}-{self.bug_id}"
+        )
+
+        print("=" * 100)
+
+        # -------------------------------------------------
+        # We only need the buggy checkout.
+        # -------------------------------------------------
+
+        if not self.buggy_dir.exists():
+
+            self.ensure_checkout(
+                version="b",
+                directory=self.buggy_dir,
+            )
+
+        # -------------------------------------------------
+        # Load previous experiment metadata.
+        # -------------------------------------------------
+
+        existing_summary = (
+            self.load_existing_summary()
+        )
+
+        modified_classes = (
+            existing_summary[
+                "modified_classes"
+            ]
+        )
+
+        print(
+            "\nModified classes:"
+        )
+
+        for class_name in (
+            modified_classes
+        ):
+
+            print(
+                f"  {class_name}"
+            )
+
+        # -------------------------------------------------
+        # Reconstruct Java method objects.
+        # -------------------------------------------------
+
+        methods = (
+            self.extract_candidate_methods(
+                modified_classes
+            )
+        )
+
+        if not methods:
+
+            raise RuntimeError(
+                "No candidate methods "
+                "could be extracted."
+            )
+
+        print(
+            f"\nCandidate methods: "
+            f"{len(methods)}"
+        )
+
+        # -------------------------------------------------
+        # Reuse B4 results.
+        # -------------------------------------------------
+
+        b4_results = (
+            self.load_existing_b4_results()
+        )
+
+        print(
+            f"Loaded existing B4 ranking: "
+            f"{len(b4_results)} methods"
+        )
+
+        print(
+            f"Using Top-{self.top_k} "
+            f"candidates."
+        )
+
+        print()
+
+        for index, candidate in enumerate(
+            b4_results[:self.top_k],
+            start=1,
+        ):
+
+            print(
+                f"  #{index} "
+                f"{candidate.method_name} "
+                f"({candidate.start_line}-"
+                f"{candidate.end_line}) "
+                f"score="
+                f"{candidate.suspicion_score:.2f}"
+            )
+
+        # -------------------------------------------------
+        # Expanded failing-test evidence.
+        # -------------------------------------------------
+
+        (
+            failing_test_context,
+            failing_tests,
+        ) = (
+            self.build_failing_test_context()
+        )
+
+        print()
+        print(
+            "Failing tests:"
+        )
+
+        for test in failing_tests:
+
+            print(
+                f"  {test}"
+            )
+
+        # -------------------------------------------------
+        # Run only Multi-Agent verification.
+        # -------------------------------------------------
+
+        multi_agent_results = (
+            self.run_multi_agent(
+                methods=methods,
+                b4_results=b4_results,
+                failing_test_context=(
+                    failing_test_context
+                ),
+            )
+        )
+
+        # -------------------------------------------------
+        # Do NOT overwrite the original result.
+        # -------------------------------------------------
+
+        output_file = (
+            self.result_dir
+            / (
+                "multi_agent_"
+                "expanded_test.jsonl"
+            )
+        )
+
+        self.write_jsonl(
+            output_file,
+            multi_agent_results,
+        )
+
+        # -------------------------------------------------
+        # Recover ground truth from previous summary.
+        # -------------------------------------------------
+
+        gt_keys = {
+            (
+                item["name"],
+                item["start_line"],
+                item["end_line"],
+            )
+            for item in (
+                existing_summary[
+                    "ground_truth_methods"
+                ]
+            )
+        }
+
+        gt_rank = None
+
+        for rank, result in enumerate(
+            multi_agent_results,
+            start=1,
+        ):
+
+            key = (
+                result["method"],
+                result["start_line"],
+                result["end_line"],
+            )
+
+            if key in gt_keys:
+
+                gt_rank = rank
+                break
+
+        metrics = (
+            self.build_metrics(
+                gt_rank
+            )
+        )
+
+        # -------------------------------------------------
+        # A/B comparison.
+        # -------------------------------------------------
+
+        old_metrics = (
+            existing_summary.get(
+                "camd_multi_agent",
+                {}
+            )
+        )
+
+        comparison = {
+            "project": (
+                self.project
+            ),
+
+            "bug_id": (
+                self.bug_id
+            ),
+
+            "failing_tests": (
+                failing_tests
+            ),
+
+            "ground_truth_methods": (
+                existing_summary[
+                    "ground_truth_methods"
+                ]
+            ),
+
+            "old_test_context": (
+                old_metrics
+            ),
+
+            "expanded_test_context": (
+                metrics
+            ),
+
+            "top_k": (
+                self.top_k
+            ),
+        }
+
+        comparison_file = (
+            self.result_dir
+            / (
+                "summary_"
+                "expanded_test.json"
+            )
+        )
+
+        self.write_json(
+            comparison_file,
+            comparison,
+        )
+
+        # -------------------------------------------------
+        # Print final ranking.
+        # -------------------------------------------------
+
+        print()
+        print("=" * 100)
+
+        print(
+            "Expanded-Test Multi-Agent "
+            "Final Ranking"
+        )
+
+        print("=" * 100)
+
+        for rank, result in enumerate(
+            multi_agent_results,
+            start=1,
+        ):
+
+            judge = (
+                result["judge"]
+            )
+
+            print(
+                f"#{rank:<3} "
+                f"{result['method']:<30} "
+                f"probability="
+                f"{judge['target_defect_probability']:.2f}"
+            )
+
+            print(
+                f"     target="
+                f"{judge['is_target_defect']}"
+            )
+
+            print(
+                f"     type="
+                f"{judge['defect_type']}"
+            )
+
+            print(
+                f"     reason="
+                f"{judge['reason']}"
+            )
+
+            print()
+
+        print("=" * 100)
+        print(
+            "A/B Evaluation"
+        )
+        print("=" * 100)
+
+        print(
+            f"Old CAMD rank: "
+            f"{old_metrics.get('rank')}"
+        )
+
+        print(
+            f"Old CAMD RR: "
+            f"{old_metrics.get('rr', 0.0):.4f}"
+        )
+
+        print()
+
+        print(
+            f"Expanded-test CAMD rank: "
+            f"{metrics['rank']}"
+        )
+
+        print(
+            f"Expanded-test CAMD RR: "
+            f"{metrics['rr']:.4f}"
+        )
+
+        print(
+            f"Expanded-test Top-1: "
+            f"{metrics['top_1']}"
+        )
+
+        print(
+            f"Expanded-test Top-3: "
+            f"{metrics['top_3']}"
+        )
+
+        print(
+            f"Expanded-test Top-5: "
+            f"{metrics['top_5']}"
+        )
+
+        print()
+        print(
+            f"Results saved to:\n"
+            f"{output_file}"
+        )
+
+        print(
+            f"\nComparison saved to:\n"
+            f"{comparison_file}"
+        )
+
+        return comparison
     # =========================================================
     # Multi-Agent GT metric
     # =========================================================
