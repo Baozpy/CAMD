@@ -1,0 +1,223 @@
+{
+  "project": "Lang",
+  "bug_start": 1,
+  "bug_end": 3,
+  "mode": "oracle_method_line_localization",
+  "top_k": 10,
+  "evaluated_bug_ids": [
+    1,
+    3
+  ],
+  "failed": [],
+  "per_bug": [
+    {
+      "project": "Lang",
+      "bug_id": 1,
+      "mode": "oracle_method",
+      "best_ground_truth_method": {
+        "class_name": "org.apache.commons.lang3.math.NumberUtils",
+        "method_name": "createNumber",
+        "method_start_line": 450,
+        "method_end_line": 614
+      },
+      "metrics": {
+        "ground_truth_lines": [
+          467,
+          468,
+          471
+        ],
+        "predicted_lines": [
+          471,
+          467,
+          468,
+          474,
+          472,
+          469,
+          466
+        ],
+        "first_hit_rank": 1,
+        "top_1": true,
+        "top_3": true,
+        "top_5": true,
+        "top_10": true,
+        "reciprocal_rank": 1.0
+      },
+      "ground_truth_method_results": [
+        {
+          "class_name": "org.apache.commons.lang3.math.NumberUtils",
+          "method_name": "createNumber",
+          "method_start_line": 450,
+          "method_end_line": 614,
+          "ground_truth_lines": [
+            467,
+            468,
+            471
+          ],
+          "predictions": [
+            {
+              "line": 471,
+              "score": 0.98,
+              "reason": "Hex type selection treats any 8-hex-digit value as fitting in Integer; failing test expects values like 0x80000000 and 0xFFFFFFFF to be Long because their first significant digit exceeds Integer range."
+            },
+            {
+              "line": 467,
+              "score": 0.94,
+              "reason": "Counts all hex digits after the prefix, including leading zeroes; failing test specifically checks leading-zero hex strings where type selection must be based on significant digits/range, not raw length."
+            },
+            {
+              "line": 468,
+              "score": 0.9,
+              "reason": "BigInteger cutoff uses only digit count >16; failing cases include 16-significant-digit values starting with 8/F that exceed Long and should become BigInteger, while leading zeroes should not force BigInteger."
+            },
+            {
+              "line": 474,
+              "score": 0.86,
+              "reason": "Returns createInteger for all hex values with 8 or fewer counted digits, causing boundary values such as 0x80000000 to be parsed as Integer instead of promoted to Long."
+            },
+            {
+              "line": 472,
+              "score": 0.65,
+              "reason": "Long return path is reached only when raw hex digit count is greater than 8, missing 8-digit out-of-Integer-range values expected to return Long."
+            },
+            {
+              "line": 469,
+              "score": 0.58,
+              "reason": "BigInteger return path is reached only for more than 16 raw hex digits, missing 16-digit out-of-Long-range values expected to return BigInteger."
+            },
+            {
+              "line": 466,
+              "score": 0.4,
+              "reason": "Enters the special hex handling block where the failing test behavior occurs; all failing assertions concern hexadecimal prefixes."
+            }
+          ],
+          "metrics": {
+            "ground_truth_lines": [
+              467,
+              468,
+              471
+            ],
+            "predicted_lines": [
+              471,
+              467,
+              468,
+              474,
+              472,
+              469,
+              466
+            ],
+            "first_hit_rank": 1,
+            "top_1": true,
+            "top_3": true,
+            "top_5": true,
+            "top_10": true,
+            "reciprocal_rank": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "project": "Lang",
+      "bug_id": 3,
+      "mode": "oracle_method",
+      "best_ground_truth_method": null,
+      "metrics": {
+        "ground_truth_lines": [],
+        "predicted_lines": [],
+        "first_hit_rank": null,
+        "top_1": false,
+        "top_3": false,
+        "top_5": false,
+        "top_10": false,
+        "reciprocal_rank": 0.0
+      },
+      "ground_truth_method_results": [
+        {
+          "class_name": "org.apache.commons.lang3.math.NumberUtils",
+          "method_name": "createNumber",
+          "method_start_line": 450,
+          "method_end_line": 610,
+          "ground_truth_lines": [
+            593,
+            597,
+            601,
+            605
+          ],
+          "predictions": [
+            {
+              "line": 602,
+              "score": 0.98,
+              "reason": "For the failing BigDecimal input, createDouble(str) produces a finite non-zero Double, so this condition passes even though the literal has more precision than Double can represent; it should not accept Double solely based on infinity/zero checks."
+            },
+            {
+              "line": 603,
+              "score": 0.92,
+              "reason": "This return causes createNumber(\"1.797693134862315759e+308\") to return a Double instead of falling through to BigDecimal, directly violating the failing test expectation."
+            },
+            {
+              "line": 591,
+              "score": 0.7,
+              "reason": "The decision logic only computes allZeros for underflow detection and does not incorporate the already-tracked decimal precision, making the later Float/Double selection too permissive."
+            },
+            {
+              "line": 497,
+              "score": 0.65,
+              "reason": "numDecimals is computed specifically to check required precision, but it is not used later when deciding whether Float or Double would lose precision for the current failing input."
+            },
+            {
+              "line": 594,
+              "score": 0.52,
+              "reason": "The Float acceptance condition has the same precision-loss weakness as the Double branch, though for the current BigDecimal input Float is likely skipped because it is infinite."
+            },
+            {
+              "line": 595,
+              "score": 0.42,
+              "reason": "This return would prematurely select Float for finite non-zero values without verifying precision, related to the precision-loss behavior covered by the failing test."
+            },
+            {
+              "line": 609,
+              "score": 0.35,
+              "reason": "This is the expected fallback for the high-precision failing input, but it is not reached because the preceding Double branch returns too early."
+            },
+            {
+              "line": 485,
+              "score": 0.3,
+              "reason": "The precision-tracking variable is initialized for the LANG-693-style precision check but the method never applies it to Float/Double selection."
+            }
+          ],
+          "metrics": {
+            "ground_truth_lines": [
+              593,
+              597,
+              601,
+              605
+            ],
+            "predicted_lines": [
+              602,
+              603,
+              591,
+              497,
+              594,
+              595,
+              609,
+              485
+            ],
+            "first_hit_rank": null,
+            "top_1": false,
+            "top_3": false,
+            "top_5": false,
+            "top_10": false,
+            "reciprocal_rank": 0.0
+          }
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "evaluated_bugs": 2,
+    "mrr": 0.5,
+    "top_1_accuracy": 0.5,
+    "top_3_accuracy": 0.5,
+    "top_5_accuracy": 0.5,
+    "top_10_accuracy": 0.5
+  }
+}
