@@ -2,62 +2,48 @@
 
 ## 
 
+1. Overview
 
-```
-CAMD/
-│
-├── README.md
-├── requirements.txt
-├── .env
-├── .gitignore
-│
-├── config/
-│   └── settings.py
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── samples/
-│
-├── camd/
-│   │
-│   ├── llm/
-│   │   ├── client.py
-│   │   └── prompts.py
-│   │
-│   ├── detectors/
-│   │   ├── base.py
-│   │   └── llm_detector.py
-│   │
-│   ├── context/
-│   │   ├── extractor.py
-│   │   └── models.py
-│   │
-│   ├── static/
-│   │   └── analyzer.py
-│   │
-│   ├── agents/
-│   │   ├── detector_agent.py
-│   │   ├── critic_agent.py
-│   │   └── judge_agent.py
-│   │
-│   └── evaluation/
-│       ├── metrics.py
-│       └── evaluator.py
-│
-├── scripts/
-│   ├── run_baseline.py
-│   ├── prepare_defects4j.py
-│   └── evaluate_baseline.py
-│
-├── experiments/
-│   ├── rq1_baseline/
-│   ├── rq2_context/
-│   ├── rq3_static/
-│   └── rq4_multi_agent/
-│
-├── results/
-│
-└── tests/
+2. Motivation
 
-```
+3. CAMD Architecture
+
+4. Method
+   4.1 Method Extraction
+   4.2 Method-only Ranking
+   4.3 Static-aware Ranking
+   4.4 Failing-Test Context
+   4.5 Multi-Agent Verification
+   4.6 Adaptive Candidate Expansion
+   4.7 Line-Level Localization
+
+5. Experimental Setup
+   - Defects4J
+   - Lang 1–20
+   - 18 valid bugs
+   - deprecated IDs
+   - model
+   - Top-K
+   - evaluation protocol
+
+6. Method-Level Results
+
+7. Line-Level Results
+   - Oracle
+   - End-to-End
+
+8. Ablations
+   - B1 vs B4
+   - basic vs expanded test context
+   - base vs adaptive CAMD
+
+9. Case Studies
+   - Lang-10 test helper
+   - Lang-20 candidate recall
+   - Lang-3 exact vs AST statement
+
+10. Limitations
+
+11. Repository Structure
+
+12. Reproduction
