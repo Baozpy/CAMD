@@ -99,6 +99,7 @@ Binary and pairwise QLoRA baselines are evaluated separately from the main CAMD 
 ---
 
 # 3. CAMD Pipeline
+![Pipeline](data/pipeline.png)
 
 ## 3.1 Method-Level Decomposition
 
