@@ -1,0 +1,31 @@
+public void testLargeSample() {
+        Random randomizer = new Random(0x5551480dca5b369bl);
+        double maxError = 0;
+        for (int degree = 0; degree < 10; ++degree) {
+            PolynomialFunction p = buildRandomPolynomial(degree, randomizer);
+
+            PolynomialFitter fitter = new PolynomialFitter(new LevenbergMarquardtOptimizer());
+            for (int i = 0; i < 40000; ++i) {
+                double x = -1.0 + i / 20000.0;
+                fitter.addObservedPoint(1.0, x,
+                                        p.value(x) + 0.1 * randomizer.nextGaussian());
+            }
+
+            final double[] init = new double[degree + 1];
+            PolynomialFunction fitted = new PolynomialFunction(fitter.fit(init));
+The last line shown above failed with the following stack trace.
+java.lang.OutOfMemoryError: Java heap space
+	at org.apache.commons.math3.linear.DiagonalMatrix.getData(DiagonalMatrix.java:204)
+	at org.apache.commons.math3.linear.TriDiagonalTransformer.<init>(TriDiagonalTransformer.java:69)
+	at org.apache.commons.math3.linear.EigenDecomposition.transformToTridiagonal(EigenDecomposition.java:561)
+	at org.apache.commons.math3.linear.EigenDecomposition.<init>(EigenDecomposition.java:122)
+	at org.apache.commons.math3.optimization.general.AbstractLeastSquaresOptimizer.squareRoot(AbstractLeastSquaresOptimizer.java:562)
+	at org.apache.commons.math3.optimization.general.AbstractLeastSquaresOptimizer.setUp(AbstractLeastSquaresOptimizer.java:508)
+	at org.apache.commons.math3.optimization.direct.BaseAbstractMultivariateVectorOptimizer.optimizeInternal(BaseAbstractMultivariateVectorOptimizer.java:239)
+	at org.apache.commons.math3.optimization.general.AbstractLeastSquaresOptimizer.optimizeInternal(AbstractLeastSquaresOptimizer.java:496)
+	at org.apache.commons.math3.optimization.general.AbstractLeastSquaresOptimizer.optimize(AbstractLeastSquaresOptimizer.java:423)
+	at org.apache.commons.math3.optimization.general.AbstractLeastSquaresOptimizer.optimize(AbstractLeastSquaresOptimizer.java:62)
+	at org.apache.commons.math3.optimization.fitting.CurveFitter.fit(CurveFitter.java:189)
+	at org.apache.commons.math3.optimization.fitting.CurveFitter.fit(CurveFitter.java:153)
+	at org.apache.commons.math3.optimization.fitting.PolynomialFitter.fit(PolynomialFitter.java:110)
+	at org.apache.commons.math3.optimization.fitting.PolynomialFitterTest.testLargeSample(PolynomialFitterTest.java:241)

@@ -1,0 +1,151 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:<code>BasicClassIntrospector.forSerialization(...).findProperties</code> should respect MapperFeature.AUTO_DETECT_GETTERS/SETTERS\nDescription:\nWhen I set the ObjectMapper MapperConfig to not AutoDetect and use the BasicClassIntrospector to get the properties, I seem to still be getting the Methods.  I am currently using version 2.7.3.\nThe following code produces this output:\nFound property count 2, there should only be one??\nFound property: name=name, internalName=name\nFound property: name=groupname, internalName=groupname\nI think it should produce only this output:\nFound property: name=groupname, internalName=groupname\npublic static void main(String [] args) {\n    class TCls {\n        @JsonProperty(\"groupname\")\n        private String groupname;\n\n        public void setName(String str) {\n            this.groupname = str;\n        }\n        public String getName() {\n            return groupname;\n        }\n    }\n\n    ObjectMapper om = new ObjectMapper();\n    // Only use explicitly specified values to be serialized/deserialized (i.e., JSONProperty).\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.AUTO_DETECT_FIELDS, false);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.AUTO_DETECT_GETTERS, false);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.AUTO_DETECT_SETTERS, false);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.AUTO_DETECT_IS_GETTERS, false);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.USE_GETTERS_AS_SETTERS, false);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.INFER_PROPERTY_MUTATORS, false);\n    om.configure(com.fasterxml.jackson.databind.MapperFeature.USE_ANNOTATIONS, true);\n\n    JavaType javaType = om.getTypeFactory().constructType(TCls.class);\n\n    BasicClassIntrospector introspector = new BasicClassIntrospector();\n    BasicBeanDescription bdesc = introspector.forSerialization(om.getSerializationConfig(), javaType, null);\n    List<BeanPropertyDefinition> bprops = bdesc.findProperties();\n\n    if (1 != bprops.size()) {\n        System.out.println(\"Found property count \" + bprops.size() + \", there should only be one??\");\n    }\n    bprops.forEach(prop -> {\n        System.out.println(\"Found property: name=\" + prop.getName() + \", internalName=\" + prop.getInternalName());\n    });\n}\n\n\n```\nThe trigger test is as follows:\n```\npublic void testVisibilityFeatures() throws Exception\n    {\n        ObjectMapper om = new ObjectMapper();\n        // Only use explicitly specified values to be serialized/deserialized (i.e., JSONProperty).\n        om.configure(MapperFeature.AUTO_DETECT_FIELDS, false);\n        om.configure(MapperFeature.AUTO_DETECT_GETTERS, false);\n        om.configure(MapperFeature.AUTO_DETECT_SETTERS, false);\n        om.configure(MapperFeature.AUTO_DETECT_IS_GETTERS, false);\n        om.configure(MapperFeature.USE_GETTERS_AS_SETTERS, false);\n        om.configure(MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);\n        om.configure(MapperFeature.INFER_PROPERTY_MUTATORS, false);\n        om.configure(MapperFeature.USE_ANNOTATIONS, true);\n\n        JavaType javaType = om.getTypeFactory().constructType(TCls.class);        \n        BeanDescription desc = (BeanDescription) om.getSerializationConfig().introspect(javaType);\n        List<BeanPropertyDefinition> props = desc.findProperties();\n        if (props.size() != 1) {\n            fail(\"Should find 1 property, not \"+props.size()+\"; properties = \"+props);\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError: Should find 1 property, not 2; properties = [[Property 'name'; ctors: null, field(s): null, getter(s): null, setter(s): [method com.fasterxml.jackson.databind.ser.TestFeatures$TCls#setName(1 params)][visible=true,ignore=false,explicitName=false]], [Property 'groupname'; ctors: null, field(s): [field com.fasterxml.jackson.databind.ser.TestFeatures$TCls#groupname][visible=true,ignore=false,explicitName=true], getter(s): null, setter(s): null]]\n\tat com.fasterxml.jackson.databind.ser.TestFeatures.testVisibilityFeatures(TestFeatures.java:300)\n```\nThe suggested methods are as follows:\n```\n1.com.fasterxml.jackson.databind.ObjectMapper.version()\n2.com.fasterxml.jackson.databind.PropertyName.toString()\n3.com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString()\n4.com.fasterxml.jackson.databind.introspect.POJOPropertiesCollector.POJOPropertiesCollector(MapperConfig<?>,boolean,JavaType,AnnotatedClass,String)\n5.com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector.version()\n6.com.fasterxml.jackson.databind.PropertyName.toString()\n7.com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString()\n8.com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.Linked.toString()\n9.com.fasterxml.jackson.databind.introspect.AnnotatedField.toString()\n10.com.fasterxml.jackson.databind.introspect.AnnotatedField.getDeclaringClass()\n11.com.fasterxml.jackson.databind.ser.BeanSerializerFactory.constructBeanSerializer(SerializerProvider,BeanDescription)\n12.com.fasterxml.jackson.databind.ObjectMapper.setVisibility(PropertyAccessor,JsonAutoDetect.Visibility)\n13.com.fasterxml.jackson.databind.deser.BeanDeserializerFactory.addBeanProps(DeserializationContext,BeanDescription,BeanDeserializerBuilder)\n14.com.fasterxml.jackson.databind.ObjectMapper.setAnnotationIntrospector(AnnotationIntrospector)\n15.com.fasterxml.jackson.databind.ser.BeanSerializerFactory.findBeanProperties(SerializerProvider,BeanDescription,BeanSerializerBuilder)\n16.com.fasterxml.jackson.databind.ObjectMapper.constructType(Type)\n17.com.fasterxml.jackson.databind.ObjectMapper.getTypeFactory()\n18.com.fasterxml.jackson.databind.type.TypeFactory.constructType(Type)\n19.com.fasterxml.jackson.databind.ObjectMapper.setTypeFactory(TypeFactory)\n20.com.fasterxml.jackson.databind.ObjectMapper.getSerializationConfig()\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can see that the issue is related to the `BasicClassIntrospector` not respecting the `MapperFeature.AUTO_DETECT_GETTERS/SETTERS` configuration. The test case is expecting to find only one property, but it's finding two.\n\nFrom the code, I can see that the `BasicClassIntrospector` is being used to introspect the `TCls` class, and the `findProperties()` method is being called to get the properties. This suggests that the issue is likely in the `BasicClassIntrospector` or its related methods.\n\nGiven the 20 suggested methods, I will start by looking at the methods that are related to the `BasicClassIntrospector` and its usage. Specifically, I will look at methods 4, 7, 8, 11, 14, and 15, as they seem to be related to the introspection and property finding process.\n\nI will start by calling `get_code_snippet_of_method(4)` to get the code snippet of method 4, which is `POJOPropertiesCollector.POJOPropertiesCollector(MapperConfig<?>,boolean,JavaType,AnnotatedClass,String)`. This method seems to be responsible for collecting properties, so it's a good starting point.\n\nPlease let me know if I should proceed with this method or if I should explore other methods first."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(4)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.introspect.POJOPropertiesCollector.POJOPropertiesCollector(MapperConfig<?>,boolean,JavaType,AnnotatedClass,String) is as follows.\nprotected POJOPropertiesCollector(MapperConfig<?> config, boolean forSerialization,\t            JavaType type, AnnotatedClass classDef, String mutatorPrefix)\t    {\t        _config = config;\t        _stdBeanNaming = config.isEnabled(MapperFeature.USE_STD_BEAN_NAMING);\t        _forSerialization = forSerialization;\t        _type = type;\t        _classDef = classDef;\t        _mutatorPrefix = (mutatorPrefix == null) ? \"set\" : mutatorPrefix;\t        _annotationIntrospector = config.isAnnotationProcessingEnabled() ?\t                _config.getAnnotationIntrospector() : null;\t        if (_annotationIntrospector == null) {\t            _visibilityChecker = _config.getDefaultVisibilityChecker();\t        } else {\t            _visibilityChecker = _annotationIntrospector.findAutoDetectVisibility(classDef,\t                    _config.getDefaultVisibilityChecker());\t        }\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(7)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString() is as follows.\n@Override\t    public String toString()\t    {\t        StringBuilder sb = new StringBuilder();\t        sb.append(\"[Property '\").append(_name)\t          .append(\"'; ctors: \").append(_ctorParameters)\t          .append(\", field(s): \").append(_fields)\t          .append(\", getter(s): \").append(_getters)\t          .append(\", setter(s): \").append(_setters)\t          ;\t        sb.append(\"]\");\t        return sb.toString();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(11)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.ser.BeanSerializerFactory.constructBeanSerializer(SerializerProvider,BeanDescription) is as follows.\n/**\t     * Method called to construct serializer for serializing specified bean type.\t     * \t     * @since 2.1\t     */\t    @SuppressWarnings(\"unchecked\")\t    protected JsonSerializer<Object> constructBeanSerializer(SerializerProvider prov,\t            BeanDescription beanDesc)\t        throws JsonMappingException\t    {\t        // 13-Oct-2010, tatu: quick sanity check: never try to create bean serializer for plain Object\t        // 05-Jul-2012, tatu: ... but we should be able to just return \"unknown type\" serializer, right?\t        if (beanDesc.getBeanClass() == Object.class) {\t            return prov.getUnknownTypeSerializer(Object.class);\t//            throw new IllegalArgumentException(\"Can not create bean serializer for Object.class\");\t        }\t        final SerializationConfig config = prov.getConfig();\t        BeanSerializerBuilder builder = constructBeanSerializerBuilder(beanDesc);\t        builder.setConfig(config);\t\t        // First: any detectable (auto-detect, annotations) properties to serialize?\t        List<BeanPropertyWriter> props = findBeanProperties(prov, beanDesc, builder);\t        if (props == null) {\t            props = new ArrayList<BeanPropertyWriter>();\t        } else {\t            props = removeOverlappingTypeIds(prov, beanDesc, builder, props);\t        }\t        \t        // [databind#638]: Allow injection of \"virtual\" properties:\t        prov.getAnnotationIntrospector().findAndAddVirtualProperties(config, beanDesc.getClassInfo(), props);\t\t        // [JACKSON-440] Need to allow modification bean properties to serialize:\t        if (_factoryConfig.hasSerializerModifiers()) {\t            for (BeanSerializerModifier mod : _factoryConfig.serializerModifiers()) {\t                props = mod.changeProperties(config, beanDesc, props);\t            }\t        }\t\t        // Any properties to suppress?\t        props = filterBeanProperties(config, beanDesc, props);\t\t        // [JACKSON-440] Need to allow reordering of properties to serialize\t        if (_factoryConfig.hasSerializerModifiers()) {\t            for (BeanSerializerModifier mod : _factoryConfig.serializerModifiers()) {\t                props = mod.orderProperties(config, beanDesc, props);\t            }\t        }\t\t        /* And if Object Id is needed, some preparation for that as well: better\t         * do before view handling, mostly for the custom id case which needs\t         * access to a property\t         */\t        builder.setObjectIdWriter(constructObjectIdHandler(prov, beanDesc, props));\t        \t        builder.setProperties(props);\t        builder.setFilterId(findFilterId(config, beanDesc));\t\t        AnnotatedMember anyGetter = beanDesc.findAnyGetter();\t        if (anyGetter != null) {\t            if (config.canOverrideAccessModifiers()) {\t                anyGetter.fixAccess(config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));\t            }\t            JavaType type = anyGetter.getType();\t            // copied from BasicSerializerFactory.buildMapSerializer():\t            boolean staticTyping = config.isEnabled(MapperFeature.USE_STATIC_TYPING);\t            JavaType valueType = type.getContentType();\t            TypeSerializer typeSer = createTypeSerializer(config, valueType);\t            // last 2 nulls; don't know key, value serializers (yet)\t            // 23-Feb-2015, tatu: As per [#705], need to support custom serializers\t            JsonSerializer<?> anySer = findSerializerFromAnnotation(prov, anyGetter);\t            if (anySer == null) {\t                // TODO: support '@JsonIgnoreProperties' with any setter?\t                anySer = MapSerializer.construct(/* ignored props*/ null, type, staticTyping,\t                        typeSer, null, null, /*filterId*/ null);\t            }\t            // TODO: can we find full PropertyName?\t            PropertyName name = PropertyName.construct(anyGetter.getName());\t            BeanProperty.Std anyProp = new BeanProperty.Std(name, valueType, null,\t                    beanDesc.getClassAnnotations(), anyGetter, PropertyMetadata.STD_OPTIONAL);\t            builder.setAnyGetter(new AnyGetterWriter(anyProp, anyGetter, anySer));\t        }\t        // Next: need to gather view information, if any:\t        processViews(config, builder);\t\t        // Finally: let interested parties mess with the result bit more...\t        if (_factoryConfig.hasSerializerModifiers()) {\t            for (BeanSerializerModifier mod : _factoryConfig.serializerModifiers()) {\t                builder = mod.updateBuilder(config, beanDesc, builder);\t            }\t        }\t        \t        JsonSerializer<Object> ser = (JsonSerializer<Object>) builder.build();\t        \t        if (ser == null) {\t            // If we get this far, there were no properties found, so no regular BeanSerializer\t            // would be constructed. But, couple of exceptions.\t            // First: if there are known annotations, just create 'empty bean' serializer\t            if (beanDesc.hasKnownClassAnnotations()) {\t                return builder.createDummy();\t            }\t        }\t        return ser;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(15)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.ser.BeanSerializerFactory.findBeanProperties(SerializerProvider,BeanDescription,BeanSerializerBuilder) is as follows.\n/**\t     * Method used to collect all actual serializable properties.\t     * Can be overridden to implement custom detection schemes.\t     */\t    protected List<BeanPropertyWriter> findBeanProperties(SerializerProvider prov,\t            BeanDescription beanDesc, BeanSerializerBuilder builder)\t        throws JsonMappingException\t    {\t        List<BeanPropertyDefinition> properties = beanDesc.findProperties();\t        final SerializationConfig config = prov.getConfig();\t\t        // [JACKSON-429]: ignore specified types\t        removeIgnorableTypes(config, beanDesc, properties);\t        \t        // and possibly remove ones without matching mutator...\t        if (config.isEnabled(MapperFeature.REQUIRE_SETTERS_FOR_GETTERS)) {\t            removeSetterlessGetters(config, beanDesc, properties);\t        }\t        \t        // nothing? can't proceed (caller may or may not throw an exception)\t        if (properties.isEmpty()) {\t            return null;\t        }\t        // null is for value type serializer, which we don't have access to from here (ditto for bean prop)\t        boolean staticTyping = usesStaticTyping(config, beanDesc, null);\t        PropertyBuilder pb = constructPropertyBuilder(config, beanDesc);\t        \t        ArrayList<BeanPropertyWriter> result = new ArrayList<BeanPropertyWriter>(properties.size());\t        final boolean fixAccess = config.canOverrideAccessModifiers();\t        final boolean forceAccess = fixAccess && config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS);\t        for (BeanPropertyDefinition property : properties) {\t            final AnnotatedMember accessor = property.getAccessor();\t            // Type id? Requires special handling:\t            if (property.isTypeId()) {\t                if (accessor != null) { // only add if we can access... but otherwise?\t                    if (fixAccess) {\t                        accessor.fixAccess(forceAccess);\t                    }\t                    builder.setTypeId(accessor);\t                }\t                continue;\t            }\t            // suppress writing of back references\t            AnnotationIntrospector.ReferenceProperty refType = property.findReferenceType();\t            if (refType != null && refType.isBackReference()) {\t                continue;\t            }\t            if (accessor instanceof AnnotatedMethod) {\t                result.add(_constructWriter(prov, property, pb, staticTyping, (AnnotatedMethod) accessor));\t            } else {\t                result.add(_constructWriter(prov, property, pb, staticTyping, (AnnotatedField) accessor));\t            }\t        }\t        return result;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit"
+        },
+        {
+            "role": "user",
+            "content": "Please call functions in the right format `FunctionName(Argument)`.\nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\n"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.ObjectMapper.version() is as follows.\n/**\t     * Method that will return version information stored in and read from jar\t     * that contains this class.\t     */\t    @Override\t    public Version version() {\t        return com.fasterxml.jackson.databind.cfg.PackageVersion.VERSION;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(3)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString() is as follows.\n@Override\t    public String toString()\t    {\t        StringBuilder sb = new StringBuilder();\t        sb.append(\"[Property '\").append(_name)\t          .append(\"'; ctors: \").append(_ctorParameters)\t          .append(\", field(s): \").append(_fields)\t          .append(\", getter(s): \").append(_getters)\t          .append(\", setter(s): \").append(_setters)\t          ;\t        sb.append(\"]\");\t        return sb.toString();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(6)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.PropertyName.toString() is as follows.\n@Override\t    public String toString() {\t        if (_namespace == null) {\t            return _simpleName;\t        }\t        return \"{\"+_namespace + \"}\" + _simpleName;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(7)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString() is as follows.\n@Override\t    public String toString()\t    {\t        StringBuilder sb = new StringBuilder();\t        sb.append(\"[Property '\").append(_name)\t          .append(\"'; ctors: \").append(_ctorParameters)\t          .append(\", field(s): \").append(_fields)\t          .append(\", getter(s): \").append(_getters)\t          .append(\", setter(s): \").append(_setters)\t          ;\t        sb.append(\"]\");\t        return sb.toString();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(8)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.Linked.toString() is as follows.\n@Override\t        public String toString() {\t            String msg = value.toString()+\"[visible=\"+isVisible+\",ignore=\"+isMarkedIgnored\t                    +\",explicitName=\"+isNameExplicit+\"]\";\t            if (next != null) {\t                msg = msg + \", \"+next.toString();\t            }\t            return msg;\t        }"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : com.fasterxml.jackson.databind.introspect.POJOPropertiesCollector.POJOPropertiesCollector(MapperConfig<?>, boolean, JavaType, AnnotatedClass, String)\nTop_2 : com.fasterxml.jackson.databind.ser.BeanSerializerFactory.constructBeanSerializer(SerializerProvider, BeanDescription)\nTop_3 : com.fasterxml.jackson.databind.ser.BeanSerializerFactory.findBeanProperties(SerializerProvider, BeanDescription, BeanSerializerBuilder)\nTop_4 : com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString()\nTop_5 : com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString()"
+        }
+    ],
+    "fl_results": [
+        "com.fasterxml.jackson.databind.introspect.POJOPropertiesCollector.POJOPropertiesCollector(MapperConfig<?>,boolean,JavaType,AnnotatedClass,String)",
+        "com.fasterxml.jackson.databind.ser.BeanSerializerFactory.constructBeanSerializer(SerializerProvider,BeanDescription)",
+        "com.fasterxml.jackson.databind.ser.BeanSerializerFactory.findBeanProperties(SerializerProvider,BeanDescription,BeanSerializerBuilder)",
+        "com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString()",
+        "com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder.toString()"
+    ]
+}

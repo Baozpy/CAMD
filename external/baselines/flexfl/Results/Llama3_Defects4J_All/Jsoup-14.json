@@ -1,0 +1,87 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The trigger test is as follows:\n```\npublic void parsesUnterminatedTextarea() {\n        // don't parse right to end, but break on <p>\n        Document doc = Jsoup.parse(\"<body><p><textarea>one<p>two\");\n        Element t = doc.select(\"textarea\").first();\n        assertEquals(\"one\", t.text());\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError: expected:<one[]> but was:<one[<p>two]>\n\tat org.jsoup.parser.ParserTest.parsesUnterminatedTextarea(ParserTest.java:101)\n```\nThe suggested methods are as follows:\n```\n1.org.jsoup.nodes.Document.title()\n2.org.jsoup.nodes.Document.title(String)\n3.org.jsoup.nodes.Document.normalise()\n4.org.jsoup.nodes.Document.createShell(String)\n5.org.jsoup.parser.TreeBuilder.parseFragment(String,Element,String)\n6.org.jsoup.parser.TreeBuilder.markInsertionMode()\n7.org.jsoup.parser.TreeBuilder.originalState()\n8.org.jsoup.nodes.Document.title()\n9.org.jsoup.parser.CharacterReader.matches(char)\n10.org.jsoup.parser.Token.isEOF()\n11.org.jsoup.Jsoup.isValid(String,Whitelist)\n12.org.jsoup.helper.DataUtil.parseByteData(ByteBuffer,String,String)\n13.org.jsoup.parser.TreeBuilder.parseFragment(String,Element,String)\n14.org.jsoup.examples.ListLinks.main(String[])\n15.org.jsoup.nodes.Element.select(String)\n16.org.jsoup.parser.TreeBuilder.parse(String,String)\n17.org.jsoup.parser.Parser.parse(String,String)\n18.org.jsoup.Jsoup.parse(String,String)\n19.org.jsoup.Jsoup.parse(String)\n20.org.jsoup.Jsoup.parse(File,String,String)\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the trigger test, I can infer that the issue is related to parsing a HTML document with an unterminated textarea tag. The test is expecting the text inside the textarea to be \"one\", but it's getting \"one[<p>two]\" instead.\n\nMy plan is to start by looking at the methods that are related to parsing and processing HTML documents. I'll start by calling `get_code_snippet_of_method()` to get the code snippet of the methods that seem most relevant.\n\nBased on the method list, I'll start by looking at methods 5, 13, and 18, which are all related to parsing HTML documents. I'll also take a look at method 15, which is related to selecting elements from a parsed document.\n\nHere's my first set of function calls:\n\n1. `get_code_snippet_of_method(5)`\n2. `get_code_snippet_of_method(13)`\n3. `get_code_snippet_of_method(18)`\n4. `get_code_snippet_of_method(15)`\n\nAfter reviewing the code snippets, I'll decide which methods to investigate further and make my next set of function calls."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(5)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.TreeBuilder.parseFragment(String,Element,String) is as follows.\nList<Node> parseFragment(String inputFragment, Element context, String baseUri) {\t        // context may be null\t        initialiseParse(inputFragment, baseUri);\t        contextElement = context;\t        fragmentParsing = true;\t        Element root = null;\t\t        if (context != null) {\t            if (context.ownerDocument() != null) // quirks setup:\t                doc.quirksMode(context.ownerDocument().quirksMode());\t\t            // initialise the tokeniser state:\t            String contextTag = context.tagName();\t            if (StringUtil.in(contextTag, \"title\", \"textarea\"))\t                tokeniser.transition(TokeniserState.Rcdata);\t            else if (StringUtil.in(contextTag, \"iframe\", \"noembed\", \"noframes\", \"style\", \"xmp\"))\t                tokeniser.transition(TokeniserState.Rawtext);\t            else if (contextTag.equals(\"script\"))\t                tokeniser.transition(TokeniserState.ScriptData);\t            else if (contextTag.equals((\"noscript\")))\t                tokeniser.transition(TokeniserState.Data); // if scripting enabled, rawtext\t            else if (contextTag.equals(\"plaintext\"))\t                tokeniser.transition(TokeniserState.Data);\t            else\t                tokeniser.transition(TokeniserState.Data); // default\t\t            root = new Element(Tag.valueOf(\"html\"), baseUri);\t            doc.appendChild(root);\t            stack.push(root);\t            resetInsertionMode();\t            // todo: setup form element to nearest form on context (up ancestor chain)\t        }\t\t        runParser();\t        if (context != null)\t            return root.childNodes();\t        else\t            return doc.childNodes();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(13)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.TreeBuilder.parseFragment(String,Element,String) is as follows.\nList<Node> parseFragment(String inputFragment, Element context, String baseUri) {\t        // context may be null\t        initialiseParse(inputFragment, baseUri);\t        contextElement = context;\t        fragmentParsing = true;\t        Element root = null;\t\t        if (context != null) {\t            if (context.ownerDocument() != null) // quirks setup:\t                doc.quirksMode(context.ownerDocument().quirksMode());\t\t            // initialise the tokeniser state:\t            String contextTag = context.tagName();\t            if (StringUtil.in(contextTag, \"title\", \"textarea\"))\t                tokeniser.transition(TokeniserState.Rcdata);\t            else if (StringUtil.in(contextTag, \"iframe\", \"noembed\", \"noframes\", \"style\", \"xmp\"))\t                tokeniser.transition(TokeniserState.Rawtext);\t            else if (contextTag.equals(\"script\"))\t                tokeniser.transition(TokeniserState.ScriptData);\t            else if (contextTag.equals((\"noscript\")))\t                tokeniser.transition(TokeniserState.Data); // if scripting enabled, rawtext\t            else if (contextTag.equals(\"plaintext\"))\t                tokeniser.transition(TokeniserState.Data);\t            else\t                tokeniser.transition(TokeniserState.Data); // default\t\t            root = new Element(Tag.valueOf(\"html\"), baseUri);\t            doc.appendChild(root);\t            stack.push(root);\t            resetInsertionMode();\t            // todo: setup form element to nearest form on context (up ancestor chain)\t        }\t\t        runParser();\t        if (context != null)\t            return root.childNodes();\t        else\t            return doc.childNodes();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(18)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.Jsoup.parse(String,String) is as follows.\n/**\t     Parse HTML into a Document. The parser will make a sensible, balanced document tree out of any HTML.\t\t     @param html    HTML to parse\t     @param baseUri The URL where the HTML was retrieved from. Used to resolve relative URLs to absolute URLs, that occur\t     before the HTML declares a {@code <base href>} tag.\t     @return sane HTML\t     */\t    public static Document parse(String html, String baseUri) {\t        return Parser.parse(html, baseUri);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(15)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.nodes.Element.select(String) is as follows.\n/**\t     * Find elements that match the {@link Selector} query, with this element as the starting context. Matched elements\t     * may include this element, or any of its children.\t     * <p/>\t     * This method is generally more powerful to use than the DOM-type {@code getElementBy*} methods, because\t     * multiple filters can be combined, e.g.:\t     * <ul>\t     * <li>{@code el.select(\"a[href]\")} - finds links ({@code a} tags with {@code href} attributes)\t     * <li>{@code el.select(\"a[href*=example.com]\")} - finds links pointing to example.com (loosely)\t     * </ul>\t     * <p/>\t     * See the query syntax documentation in {@link org.jsoup.select.Selector}.\t     *\t     * @param query a {@link Selector} query\t     * @return elements that match the query (empty if none match)\t     * @see org.jsoup.select.Selector\t     */\t    public Elements select(String query) {\t        return Selector.select(query, this);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.jsoup.parser.TreeBuilder.parseFragment(String, Element, String)\nTop_2 : org.jsoup.parser.TreeBuilder.parse(String, String)\nTop_3 : org.jsoup.Jsoup.parse(String, String)\nTop_4 : org.jsoup.nodes.Element.select(String)\nTop_5 : org.jsoup.parser.TreeBuilder.markInsertionMode()"
+        }
+    ],
+    "fl_results": [
+        "org.jsoup.parser.TreeBuilder.parseFragment(String,Element,String)",
+        "org.jsoup.parser.TreeBuilder.parse(String,String)",
+        "org.jsoup.Jsoup.parse(String,String)",
+        "org.jsoup.nodes.Element.select(String)",
+        "org.jsoup.parser.TreeBuilder.markInsertionMode()"
+    ]
+}

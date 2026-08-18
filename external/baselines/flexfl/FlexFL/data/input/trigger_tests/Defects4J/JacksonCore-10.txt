@@ -1,0 +1,27 @@
+public void testIssue207() throws Exception
+    {
+        ByteQuadsCanonicalizer nc = ByteQuadsCanonicalizer.createRoot(-523743345);
+        Field byteSymbolCanonicalizerField = JsonFactory.class.getDeclaredField("_byteSymbolCanonicalizer");
+        byteSymbolCanonicalizerField.setAccessible(true);
+        JsonFactory jsonF = new JsonFactory();
+        byteSymbolCanonicalizerField.set(jsonF, nc);
+
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("{\n");
+        stringBuilder.append("    \"expectedGCperPosition\": null");
+        for (int i = 0; i < 60; ++i) {
+            stringBuilder.append(",\n    \"").append(i + 1).append("\": null");
+        }
+        stringBuilder.append("\n}");
+
+        JsonParser p = jsonF.createParser(stringBuilder.toString().getBytes("UTF-8"));
+        while (p.nextToken() != null) { }
+The last line shown above failed with the following stack trace.
+java.lang.ArrayIndexOutOfBoundsException: 256
+	at com.fasterxml.jackson.core.sym.ByteQuadsCanonicalizer.addName(ByteQuadsCanonicalizer.java:853)
+	at com.fasterxml.jackson.core.json.UTF8StreamJsonParser.addName(UTF8StreamJsonParser.java:2340)
+	at com.fasterxml.jackson.core.json.UTF8StreamJsonParser.parseEscapedName(UTF8StreamJsonParser.java:1980)
+	at com.fasterxml.jackson.core.json.UTF8StreamJsonParser.slowParseName(UTF8StreamJsonParser.java:1867)
+	at com.fasterxml.jackson.core.json.UTF8StreamJsonParser._parseName(UTF8StreamJsonParser.java:1651)
+	at com.fasterxml.jackson.core.json.UTF8StreamJsonParser.nextToken(UTF8StreamJsonParser.java:740)
+	at com.fasterxml.jackson.core.sym.TestByteBasedSymbols.testIssue207(TestByteBasedSymbols.java:119)

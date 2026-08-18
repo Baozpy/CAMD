@@ -1,0 +1,99 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:WrongTypeOfReturnValue when abstract class have two abstract method\nDescription:\nHey\nI found a strange problem, when i create a abstract class:\nabstract class AbstractClass {\n    abstract protected Long lol();\n    abstract protected String wow();\n    public String give() {\n        wow();\n        lol();\n        return \"give\";\n    }\n}\nand i have another class extends abstract Class:\npublic class ClassExtendsAbstractClass extends AbstractClass {\n@Override\n protected Long lol() {\n        return 2L;\n    }\n    @Override\n    protected String wow() {\n        return \"WOW\";\n    }\n}\nand I have class:\npublic class A {\n  private ClassExtendsAbstractClass classExtendsAbstractClass;\n  public A(ClassExtendsAbstractClass classExtendsAbstractClass) {\n    this.classExtendsAbstractClass = classExtendsAbstractClass;\n  }\n  public String doSomeThing(){\n    return classExtendsAbstractClass.wow();\n  }\n}\nand when i try mock method doSomeThing() from A class in test:\n  @Mock\n  private ClassExtendsAbstractClass classExtendsAbstractClass;\n  private A a;\n\n  @Before\n  public void before(){\n    Mockito.when(classExtendsAbstractClass.give()).thenReturn(\"aaa\");\n  }\n  @Test\n  public void test() {\n    a = new A(classExtendsAbstractClass);\n  }\nI get the error:\n\norg.mockito.exceptions.misusing.WrongTypeOfReturnValue:\nString cannot be returned by lol()\nlol() should return Long\n\nThis is strange behavior, because the method lol() should not be called, but when I delete one abstract method everything is good.\n\n```\nThe trigger test is as follows:\n```\npublic void should_serialize_and_deserialize_mock_created_by_deep_stubs() throws Exception {\n        // given\n        SampleClass sampleClass = mock(SampleClass.class, withSettings().defaultAnswer(Mockito.RETURNS_DEEP_STUBS).serializable());\n        when(sampleClass.getSample().isSth()).thenReturn(STUBBED_BOOLEAN_VALUE);\n        when(sampleClass.getSample().getNumber()).thenReturn(STUBBED_INTEGER_VALUE);\n\n        // when\n        Object o = SimpleSerializationUtil.serializeAndBack(sampleClass);\nThe last line shown above failed with the following stack trace.\njava.io.NotSerializableException: org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs$2\n\tat org.mockitoutil.SimpleSerializationUtil.serializeMock(SimpleSerializationUtil.java:34)\n\tat org.mockitoutil.SimpleSerializationUtil.serializeAndBack(SimpleSerializationUtil.java:16)\n\tat org.mockitousage.stubbing.DeepStubsSerializableTest.should_serialize_and_deserialize_mock_created_by_deep_stubs(DeepStubsSerializableTest.java:25)\n```\nThe suggested methods are as follows:\n```\n1.org.mockito.internal.creation.jmock.SearchingClassLoader.findClass(String)\n2.org.mockito.internal.util.reflection.FieldInitializer.checkNotAbstract(Field)\n3.org.mockito.internal.util.reflection.FieldInitializer.FieldInitializer(Object,Field,ConstructorInstantiator)\n4.org.mockito.internal.creation.jmock.SearchingClassLoader.SearchingClassLoader(ClassLoader,ClassLoader)\n5.org.mockito.internal.util.reflection.FieldInitializer.checkNotInner(Field)\n6.org.mockito.internal.creation.jmock.SearchingClassLoader.findClass(String)\n7.org.mockito.internal.creation.jmock.SearchingClassLoader.SearchingClassLoader(ClassLoader,ClassLoader)\n8.org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.recordDeepStubMock(Object,InvocationContainerImpl)\n9.org.mockito.internal.util.reflection.GenericMetadataSupport.rawExtraInterfaces()\n10.org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.getMock(InvocationOnMock,GenericMetadataSupport)\n11.org.mockito.internal.creation.AcrossJVMSerializationFeature.MockitoMockObjectInputStream.hackClassNameToMatchNewlyCreatedClass(ObjectStreamClass,Class<?>)\n12.org.mockito.exceptions.Reporter.wrongTypeOfArgumentToReturn(InvocationOnMock,String,Class,int)\n13.org.mockito.exceptions.Reporter.wrongTypeOfReturnValue(String,String,String)\n14.org.mockito.Mockito.when(T)\n15.org.mockito.Mockito.stub(T)\n16.org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.createNewDeepStubMock(GenericMetadataSupport)\n17.org.mockito.internal.creation.CglibMockMaker.cast(MockHandler)\n18.org.mockito.internal.invocation.InvocationImpl.equalArguments(Object[])\n19.org.mockito.internal.invocation.InvocationImpl.equalArguments(Object[])\n20.org.mockito.internal.invocation.InvocationImpl.equalArguments(Object[])\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report, I can see that the issue is related to the wrong type of return value in the `lol()` method. The method is expected to return a `Long` but it is returning a `String`. \n\nThe trigger test is not directly related to the bug report, but it seems to be a test that is failing due to the same issue.\n\nThe suggested methods are a mix of Mockito's internal methods and other methods. \n\nTo locate the faulty method, I will start by looking at the methods that are related to Mockito's internal workings. \n\nI will start by calling `get_code_snippet_of_method(1)` to get the code snippet of the first suggested method, `SearchingClassLoader.findClass(String)`. This method seems to be related to finding classes, which might be relevant to the issue.\n\nI will then call `get_code_snippet_of_method(8)` to get the code snippet of the `ReturnsDeepStubs.recordDeepStubMock(Object,InvocationContainerImpl)` method. This method seems to be related to recording deep stubs, which might be relevant to the issue.\n\nI will then call `get_code_snippet_of_method(14)` to get the code snippet of the `Reporter.wrongTypeOfArgumentToReturn(InvocationOnMock,String,Class,int)` method. This method seems to be related to reporting wrong type of return value, which is the issue described in the bug report.\n\nI will then call `get_code_snippet_of_method(15)` to get the code snippet of the `when(T)` method. This method is used to specify the behavior of a mock, and it might be related to the issue.\n\nI will then call `get_code_snippet_of_method(16)` to get the code snippet of the `stub(T)` method. This method is used to specify the behavior of a mock, and it might be related to the issue.\n\nI will then call `get_code_snippet_of_method(17)` to get the code snippet of the `CglibMockMaker.cast(MockHandler)` method. This method seems to be related to creating mock objects, which might be relevant to the issue.\n\nI will then call `get_code_snippet_of_method(18)` to get the code snippet of the `InvocationImpl.equalArguments(Object[])` method. This method seems to be related to comparing arguments, which might be relevant to the issue.\n\nI will then call `get_code_snippet_of_method(19)` to get the code snippet of the `InvocationImpl.equalArguments(Object[])` method. This method seems to be related to comparing arguments, which might be relevant to the issue.\n\nI will then call `get_code_snippet_of_method(20)` to get the code snippet of the `InvocationImpl.equalArguments(Object[])` method. This method seems to be related to comparing arguments, which might be relevant to the issue.\n\nAfter analyzing the code snippets, I will then call `exit()` to give my final answer."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.creation.jmock.SearchingClassLoader.findClass(String) is as follows.\n@Override\t    protected Class<?> findClass(String name) throws ClassNotFoundException {\t        if (nextToSearch != null) {\t            return nextToSearch.loadClass(name);\t        } else {\t            return super.findClass(name); // will throw ClassNotFoundException\t        }\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(8)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.recordDeepStubMock(Object,InvocationContainerImpl) is as follows.\nprivate Object recordDeepStubMock(final Object mock, InvocationContainerImpl container) throws Throwable {\t\t        container.addAnswer(new Answer<Object>() {\t            public Object answer(InvocationOnMock invocation) throws Throwable {\t                return mock;\t            }\t        }, false);\t\t        return mock;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(14)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.Mockito.when(T) is as follows.\n/**\t     * Enables stubbing methods. Use it when you want the mock to return particular value when particular method is called. \t     * <p>\t     * Simply put: \"<b>When</b> the x method is called <b>then</b> return y\".\t     * <p>\t     * <b>when() is a successor of deprecated {@link Mockito#stub(Object)}</b>\t     * <p>\t     * Examples:\t     * \t     * <pre class=\"code\"><code class=\"java\">\t     * <b>when</b>(mock.someMethod()).<b>thenReturn</b>(10);\t     *\t     * //you can use flexible argument matchers, e.g:\t     * when(mock.someMethod(<b>anyString()</b>)).thenReturn(10);\t     *\t     * //setting exception to be thrown:\t     * when(mock.someMethod(\"some arg\")).thenThrow(new RuntimeException());\t     *\t     * //you can set different behavior for consecutive method calls.\t     * //Last stubbing (e.g: thenReturn(\"foo\")) determines the behavior of further consecutive calls.\t     * when(mock.someMethod(\"some arg\"))\t     *  .thenThrow(new RuntimeException())\t     *  .thenReturn(\"foo\");\t     *  \t     * //Alternative, shorter version for consecutive stubbing:\t     * when(mock.someMethod(\"some arg\"))\t     *  .thenReturn(\"one\", \"two\");\t     * //is the same as:\t     * when(mock.someMethod(\"some arg\"))\t     *  .thenReturn(\"one\")\t     *  .thenReturn(\"two\");\t     *\t     * //shorter version for consecutive method calls throwing exceptions:\t     * when(mock.someMethod(\"some arg\"))\t     *  .thenThrow(new RuntimeException(), new NullPointerException();\t     *   \t     * </code></pre>\t     * \t     * For stubbing void methods with throwables see: {@link Mockito#doThrow(Throwable)}\t     * <p>\t     * Stubbing can be overridden: for example common stubbing can go to fixture\t     * setup but the test methods can override it.\t     * Please note that overridding stubbing is a potential code smell that points out too much stubbing.\t     * <p>\t     * Once stubbed, the method will always return stubbed value regardless\t     * of how many times it is called.\t     * <p>\t     * Last stubbing is more important - when you stubbed the same method with\t     * the same arguments many times.\t     * <p>\t     * Although it is possible to verify a stubbed invocation, usually <b>it's just redundant</b>.\t     * Let's say you've stubbed <code>foo.bar()</code>.\t     * If your code cares what <code>foo.bar()</code> returns then something else breaks(often before even <code>verify()</code> gets executed).\t     * If your code doesn't care what <code>get(0)</code> returns then it should not be stubbed.\t     * Not convinced? See <a href=\"http://monkeyisland.pl/2008/04/26/asking-and-telling\">here</a>.\t     * \t     * <p>\t     * See examples in javadoc for {@link Mockito} class\t     * @param methodCall method to be stubbed\t     * @return OngoingStubbing object used to stub fluently.\t     *         <strong>Do not</strong> create a reference to this returned object.\t     */\t    public static <T> OngoingStubbing<T> when(T methodCall) {\t        return MOCKITO_CORE.when(methodCall);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.createNewDeepStubMock(GenericMetadataSupport) is as follows.\n/**\t     * Creates a mock using the Generics Metadata.\t     *\t     * <li>Finally as we want to mock the actual type, but we want to pass along the contextual generics meta-data\t     * that was resolved for the current return type, for this to happen we associate to the mock an new instance of\t     * {@link ReturnsDeepStubs} answer in which we will store the returned type generic metadata.\t     *\t     * @param returnTypeGenericMetadata The metadata to use to create the new mock.\t     * @return The mock\t     */\t    private Object createNewDeepStubMock(GenericMetadataSupport returnTypeGenericMetadata) {\t        return mockitoCore.mock(\t                returnTypeGenericMetadata.rawType(),\t                withSettingsUsing(returnTypeGenericMetadata)\t        );\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(17)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.creation.CglibMockMaker.cast(MockHandler) is as follows.\nprivate InternalMockHandler cast(MockHandler handler) {\t        if (!(handler instanceof InternalMockHandler)) {\t            throw new MockitoException(\"At the moment you cannot provide own implementations of MockHandler.\" +\t                    \"\\nPlease see the javadocs for the MockMaker interface.\");\t        }\t        return (InternalMockHandler) handler;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.mockito.internal.creation.jmock.SearchingClassLoader.findClass(String)\nTop_2 : org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.recordDeepStubMock(Object, InvocationContainerImpl)\nTop_3 : org.mockito.Mockito.when(T)\nTop_4 : org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.createNewDeepStubMock(GenericMetadataSupport)\nTop_5 : org.mockito.internal.creation.CglibMockMaker.cast(MockHandler)"
+        }
+    ],
+    "fl_results": [
+        "org.mockito.internal.creation.jmock.SearchingClassLoader.findClass(String)",
+        "org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.recordDeepStubMock(Object,InvocationContainerImpl)",
+        "org.mockito.Mockito.when(T)",
+        "org.mockito.internal.stubbing.defaultanswers.ReturnsDeepStubs.createNewDeepStubMock(GenericMetadataSupport)",
+        "org.mockito.internal.creation.CglibMockMaker.cast(MockHandler)"
+    ]
+}

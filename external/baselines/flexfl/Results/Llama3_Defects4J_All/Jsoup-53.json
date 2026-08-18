@@ -1,0 +1,87 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:Parse failed with org.jsoup.select.Selector$SelectorParseException when selector has unbalanced '(' or '[' or ')' or ']' \nDescription:\nSelector I am having as following div.card-content2:has(a.subtitle[title= MySubTitle:)]) OR a.title[title=MyTitle :] ]\n\n```\nThe trigger test is as follows:\n```\npublic void attributeWithBrackets() {\n        String html = \"<div data='End]'>One</div> <div data='[Another)]]'>Two</div>\";\n        Document doc = Jsoup.parse(html);\n        assertEquals(\"One\", doc.select(\"div[data='End]'\").first().text());\nThe last line shown above failed with the following stack trace.\norg.jsoup.select.Selector$SelectorParseException: Could not parse query 'div[data='End]'': unexpected token at '''\n\tat org.jsoup.select.QueryParser.findElements(QueryParser.java:196)\n\tat org.jsoup.select.QueryParser.parse(QueryParser.java:65)\n\tat org.jsoup.select.QueryParser.parse(QueryParser.java:39)\n\tat org.jsoup.select.Selector.<init>(Selector.java:84)\n\tat org.jsoup.select.Selector.select(Selector.java:106)\n\tat org.jsoup.nodes.Element.select(Element.java:286)\n\tat org.jsoup.select.SelectorTest.attributeWithBrackets(SelectorTest.java:668)\n```\nThe suggested methods are as follows:\n```\n1.org.jsoup.select.QueryParser.findElements()\n2.org.jsoup.select.QueryParser.byAttribute()\n3.org.jsoup.select.Selector.Selector(String,Element)\n4.org.jsoup.select.QueryParser.cssNthChild(boolean,boolean)\n5.org.jsoup.select.Selector.select(String,Iterable<Element>)\n6.org.jsoup.select.Selector.SelectorParseException.SelectorParseException(String,Object)\n7.org.jsoup.select.Evaluator.AttributeWithValue.AttributeWithValue(String,String)\n8.org.jsoup.select.Evaluator.AttributeKeyPair.AttributeKeyPair(String,String)\n9.org.jsoup.parser.TokenQueue.remainder()\n10.org.jsoup.select.QueryParser.byAttribute()\n11.org.jsoup.examples.HtmlToPlainText.main(String)\n12.org.jsoup.nodes.Element.select(String)\n13.org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList)\n14.org.jsoup.safety.Whitelist.relaxed()\n15.org.jsoup.nodes.Document.title()\n16.org.jsoup.select.QueryParser.parse(String)\n17.org.jsoup.select.QueryParser.findElements()\n18.org.jsoup.select.QueryParser.consumeSubQuery()\n19.org.jsoup.select.QueryParser.matches(boolean)\n20.org.jsoup.select.QueryParser.parse()\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can infer that the issue is related to parsing a selector with unbalanced parentheses or brackets. The trigger test is trying to parse a selector with a closing bracket ']' in the attribute value, which is causing the `Selector$SelectorParseException`.\n\nGiven the suggested methods, I plan to focus on the methods related to parsing and selecting elements in Jsoup. I will start by looking at the methods that are involved in parsing the selector.\n\nMy first 5 method calls will be:\n\n1. `get_code_snippet_of_method(16)` - This will give me the code snippet of the `QueryParser.parse(String)` method, which is responsible for parsing the selector.\n\n2. `get_code_snippet_of_method(17)` - This will give me the code snippet of the `QueryParser.findElements()` method, which is called by `QueryParser.parse(String)`.\n\n3. `get_code_snippet_of_method(2)` - This will give me the code snippet of the `QueryParser.byAttribute()` method, which is also called by `QueryParser.parse(String)`.\n\n4. `get_code_snippet_of_method(1)` - This will give me the code snippet of the `QueryParser.findElements()` method, which is the first method called by `QueryParser.parse(String)`.\n\n5. `get_code_snippet_of_method(6)` - This will give me the code snippet of the `Selector.Selector(String, Element)` method, which is called by `QueryParser.parse(String)`.\n\nAfter analyzing the code snippets, I will try to identify the method that is causing the `Selector$SelectorParseException` and is responsible for parsing the selector with unbalanced parentheses or brackets."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.select.QueryParser.parse(String) is as follows.\n/**\t     * Parse a CSS query into an Evaluator.\t     * @param query CSS query\t     * @return Evaluator\t     */\t    public static Evaluator parse(String query) {\t        QueryParser p = new QueryParser(query);\t        return p.parse();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(17)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.select.QueryParser.findElements() is as follows.\nprivate void findElements() {\t        if (tq.matchChomp(\"#\"))\t            byId();\t        else if (tq.matchChomp(\".\"))\t            byClass();\t        else if (tq.matchesWord())\t            byTag();\t        else if (tq.matches(\"[\"))\t            byAttribute();\t        else if (tq.matchChomp(\"*\"))\t            allElements();\t        else if (tq.matchChomp(\":lt(\"))\t            indexLessThan();\t        else if (tq.matchChomp(\":gt(\"))\t            indexGreaterThan();\t        else if (tq.matchChomp(\":eq(\"))\t            indexEquals();\t        else if (tq.matches(\":has(\"))\t            has();\t        else if (tq.matches(\":contains(\"))\t            contains(false);\t        else if (tq.matches(\":containsOwn(\"))\t            contains(true);\t        else if (tq.matches(\":matches(\"))\t            matches(false);\t        else if (tq.matches(\":matchesOwn(\"))\t            matches(true);\t        else if (tq.matches(\":not(\"))\t            not();\t\t\telse if (tq.matchChomp(\":nth-child(\"))\t        \tcssNthChild(false, false);\t        else if (tq.matchChomp(\":nth-last-child(\"))\t        \tcssNthChild(true, false);\t        else if (tq.matchChomp(\":nth-of-type(\"))\t        \tcssNthChild(false, true);\t        else if (tq.matchChomp(\":nth-last-of-type(\"))\t        \tcssNthChild(true, true);\t        else if (tq.matchChomp(\":first-child\"))\t        \tevals.add(new Evaluator.IsFirstChild());\t        else if (tq.matchChomp(\":last-child\"))\t        \tevals.add(new Evaluator.IsLastChild());\t        else if (tq.matchChomp(\":first-of-type\"))\t        \tevals.add(new Evaluator.IsFirstOfType());\t        else if (tq.matchChomp(\":last-of-type\"))\t        \tevals.add(new Evaluator.IsLastOfType());\t        else if (tq.matchChomp(\":only-child\"))\t        \tevals.add(new Evaluator.IsOnlyChild());\t        else if (tq.matchChomp(\":only-of-type\"))\t        \tevals.add(new Evaluator.IsOnlyOfType());\t        else if (tq.matchChomp(\":empty\"))\t        \tevals.add(new Evaluator.IsEmpty());\t        else if (tq.matchChomp(\":root\"))\t        \tevals.add(new Evaluator.IsRoot());\t\t\telse // unhandled\t            throw new Selector.SelectorParseException(\"Could not parse query '%s': unexpected token at '%s'\", query, tq.remainder());\t\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(2)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.select.QueryParser.byAttribute() is as follows.\nprivate void byAttribute() {\t        TokenQueue cq = new TokenQueue(tq.chompBalanced('[', ']')); // content queue\t        String key = cq.consumeToAny(AttributeEvals); // eq, not, start, end, contain, match, (no val)\t        Validate.notEmpty(key);\t        cq.consumeWhitespace();\t\t        if (cq.isEmpty()) {\t            if (key.startsWith(\"^\"))\t                evals.add(new Evaluator.AttributeStarting(key.substring(1)));\t            else\t                evals.add(new Evaluator.Attribute(key));\t        } else {\t            if (cq.matchChomp(\"=\"))\t                evals.add(new Evaluator.AttributeWithValue(key, cq.remainder()));\t\t            else if (cq.matchChomp(\"!=\"))\t                evals.add(new Evaluator.AttributeWithValueNot(key, cq.remainder()));\t\t            else if (cq.matchChomp(\"^=\"))\t                evals.add(new Evaluator.AttributeWithValueStarting(key, cq.remainder()));\t\t            else if (cq.matchChomp(\"$=\"))\t                evals.add(new Evaluator.AttributeWithValueEnding(key, cq.remainder()));\t\t            else if (cq.matchChomp(\"*=\"))\t                evals.add(new Evaluator.AttributeWithValueContaining(key, cq.remainder()));\t\t            else if (cq.matchChomp(\"~=\"))\t                evals.add(new Evaluator.AttributeWithValueMatching(key, Pattern.compile(cq.remainder())));\t            else\t                throw new Selector.SelectorParseException(\"Could not parse attribute query '%s': unexpected token at '%s'\", query, cq.remainder());\t        }\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(6)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.select.Selector.SelectorParseException.SelectorParseException(String,Object) is as follows.\npublic SelectorParseException(String msg, Object... params) {\t            super(String.format(msg, params));\t        }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.jsoup.select.QueryParser.parse(String)\nTop_2 : org.jsoup.select.QueryParser.byAttribute()\nTop_3 : org.jsoup.select.QueryParser.findElements()\nTop_4 : org.jsoup.select.QueryParser.byAttribute()\nTop_5 : org.jsoup.select.QueryParser.findElements()"
+        }
+    ],
+    "fl_results": [
+        "org.jsoup.select.QueryParser.parse(String)",
+        "org.jsoup.select.QueryParser.byAttribute()",
+        "org.jsoup.select.QueryParser.findElements()",
+        "org.jsoup.select.QueryParser.byAttribute()",
+        "org.jsoup.select.QueryParser.findElements()"
+    ]
+}

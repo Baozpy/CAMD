@@ -1,0 +1,33 @@
+public void testBoundaryRangeTooLarge() {
+        final CMAESOptimizer optimizer = new CMAESOptimizer();
+        final MultivariateFunction fitnessFunction = new MultivariateFunction() {
+                public double value(double[] parameters) {
+                    if (Double.isNaN(parameters[0])) {
+                        throw new MathIllegalStateException();
+                    }
+                    final double target = 1;
+                    final double error = target - parameters[0];
+                    return error * error;
+                }
+            };
+
+        final double[] start = { 0 };
+
+        // The difference between upper and lower bounds is used to used
+        // normalize the variables: In case of overflow, NaN is produced.
+        final double max = Double.MAX_VALUE / 2;
+        final double tooLarge = FastMath.nextUp(max);
+        final double[] lower = { -tooLarge };
+        final double[] upper = { tooLarge };
+        final double[] result = optimizer.optimize(10000, fitnessFunction, GoalType.MINIMIZE,
+The last line shown above failed with the following stack trace.
+java.lang.Exception: Unexpected exception, expected<org.apache.commons.math3.exception.NumberIsTooLargeException> but was<org.apache.commons.math3.exception.MathIllegalStateException>
+	at org.apache.commons.math3.optimization.direct.CMAESOptimizerTest$2.value(CMAESOptimizerTest.java:414)
+	at org.apache.commons.math3.optimization.direct.BaseAbstractMultivariateOptimizer.computeObjectiveValue(BaseAbstractMultivariateOptimizer.java:99)
+	at org.apache.commons.math3.optimization.direct.CMAESOptimizer$FitnessFunction.value(CMAESOptimizer.java:958)
+	at org.apache.commons.math3.optimization.direct.CMAESOptimizer.doOptimize(CMAESOptimizer.java:365)
+	at org.apache.commons.math3.optimization.direct.BaseAbstractMultivariateOptimizer.optimizeInternal(BaseAbstractMultivariateOptimizer.java:148)
+	at org.apache.commons.math3.optimization.direct.BaseAbstractMultivariateOptimizer.optimize(BaseAbstractMultivariateOptimizer.java:105)
+	at org.apache.commons.math3.optimization.direct.BaseAbstractMultivariateSimpleBoundsOptimizer.optimize(BaseAbstractMultivariateSimpleBoundsOptimizer.java:140)
+	at org.apache.commons.math3.optimization.direct.CMAESOptimizerTest.testBoundaryRangeTooLarge(CMAESOptimizerTest.java:430)
+	at org.apache.commons.math3.RetryRunner$1.evaluate(RetryRunner.java:60)

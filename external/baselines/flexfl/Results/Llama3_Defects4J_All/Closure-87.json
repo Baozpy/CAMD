@@ -1,0 +1,151 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:IE8 error: Object doesn't support this action\nDescription:What steps will reproduce the problem?\n1. Use script with fragment like\r\n    if (e.onchange) {\r\n      e.onchange({\r\n        _extendedByPrototype: Prototype.emptyFunction,\r\n        target: e\r\n      });\r\n    }\r\n2. Compile with Compiler (command-line, latest version)\r\n3. Use in IE8\r\n\r\nWhat is the expected output?\r\nScript:\r\nif(b.onchange){b.onchange({_extendedByPrototype:Prototype.emptyFunction,target\r\n:b})}\r\n\r\nWhat do you see instead?\r\nScript:\r\nb.onchange&&b.onchange({_extendedByPrototype:Prototype.emptyFunction,target\r\n:b})\r\nIE8:\r\nError message \"Object doesn't support this action\"\r\n\r\nWhat version of the product are you using? On what operating system?\nVersion: 20100917 (revision 440)\r\nBuilt on: 2010/09/17 17:55\r\n\n```\nThe trigger test is as follows:\n```\npublic void testIssue291() {\n    fold(\"if (true) { f.onchange(); }\", \"if (1) f.onchange();\");\n    foldSame(\"if (f) { f.onchange(); }\");\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError: \n\tat com.google.javascript.jscomp.CompilerTestCase.test(CompilerTestCase.java:818)\n\tat com.google.javascript.jscomp.CompilerTestCase.test(CompilerTestCase.java:398)\n\tat com.google.javascript.jscomp.CompilerTestCase.test(CompilerTestCase.java:323)\n\tat com.google.javascript.jscomp.CompilerTestCase.test(CompilerTestCase.java:292)\n\tat com.google.javascript.jscomp.CompilerTestCase.test(CompilerTestCase.java:280)\n\tat com.google.javascript.jscomp.CompilerTestCase.testSame(CompilerTestCase.java:512)\n\tat com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntaxTest.foldSame(PeepholeSubstituteAlternateSyntaxTest.java:66)\n\tat com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntaxTest.testIssue291(PeepholeSubstituteAlternateSyntaxTest.java:568)\n```\nThe suggested methods are as follows:\n```\n1.com.google.javascript.jscomp.NameReferenceGraphReport.generateHtmlReportHeader(StringBuilder)\n2.com.google.javascript.rhino.Node.propToString(int)\n3.com.google.javascript.rhino.Node.toStringTreeHelper(Node,int,Appendable)\n4.com.google.javascript.jscomp.TightenTypes.process(Node,Node)\n5.com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.tryReduceReturn(Node)\n6.com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isLowerPrecedenceInExpression(Node,int)\n7.com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isPropertyAssignmentInExpression(Node)\n8.com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isPropertyAssignmentInExpression(Node)\n9.com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isLowerPrecedenceInExpression(Node,int)\n10.com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.getBlockExpression(Node)\n11.com.google.javascript.rhino.jstype.JSTypeRegistry.initializeBuiltInTypes()\n12.com.google.javascript.jscomp.CompilerOptions.CompilerOptions()\n13.com.google.javascript.rhino.testing.BaseJSTypeTestCase.addNativeProperties(JSTypeRegistry)\n14.com.google.javascript.jscomp.TypeCheck.visitFunction(NodeTraversal,Node)\n15.com.google.javascript.jscomp.TypeCheck.visitInterfaceGetprop(NodeTraversal,Node,Node,String,Node,Node)\n16.com.google.javascript.jscomp.Compiler.compile(JSSourceFile,JSSourceFile,CompilerOptions)\n17.com.google.javascript.jscomp.Compiler.compile(JSSourceFile,JSModule[],CompilerOptions)\n18.com.google.javascript.jscomp.Compiler.compile(JSSourceFile[],JSSourceFile[],CompilerOptions)\n19.com.google.javascript.jscomp.Compiler.compile(List<JSSourceFile>,List<JSSourceFile>,CompilerOptions)\n20.com.google.javascript.jscomp.Compiler.process(CompilerPass)\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can infer that the issue is related to the JavaScript compiler and its behavior in IE8. The bug report mentions an \"Object doesn't support this action\" error, which suggests that the compiler is trying to access an object property or method that is not supported in IE8.\n\nThe trigger test is a test case that fails with an \"Object doesn't support this action\" error, which further suggests that the issue is related to the compiler's behavior in IE8.\n\nGiven the information, I plan to use the function calls to retrieve code snippets of the suggested methods and analyze them to identify potential issues.\n\nHere's my plan:\n\n1. Start by analyzing the methods that are most likely to be related to the compiler's behavior in IE8. Based on the bug report and the trigger test, I suspect that methods related to the JavaScript compiler's behavior in IE8 are more likely to be the culprit.\n2. Use the function calls to retrieve code snippets of the top 5 most likely culprit methods. I will start by calling `get_code_snippet_of_method(1)` to get the code snippet of the first method, `com.google.javascript.jscomp.NameReferenceGraphReport.generateHtmlReportHeader(StringBuilder)`.\n3. Analyze the code snippet to see if it contains any code that is specific to IE8 or if it uses any IE8-specific features.\n4. If the code snippet does not contain any IE8-specific code, I will move on to the next method and repeat the process.\n5. If the code snippet contains IE8-specific code or uses IE8-specific features, I will investigate further to see if it is the cause of the issue.\n6. If I am unable to identify the issue using the top 5 most likely culprit methods, I will use the remaining function calls to retrieve code snippets of the other methods and analyze them.\n\nBased on this plan, I will start by calling `get_code_snippet_of_method(1)` to get the code snippet of the first method, `com.google.javascript.jscomp.NameReferenceGraphReport.generateHtmlReportHeader(StringBuilder)`."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.NameReferenceGraphReport.generateHtmlReportHeader(StringBuilder) is as follows.\n/**\t   *  Generate the HTML header for the report style.\t   * Borrowed straight from NameAnalyzer's report style.\t   *\t   * @param builder contents of the report to be generated\t   */\t  private void generateHtmlReportHeader(StringBuilder builder) {\t    builder.append(\"<!DOCTYPE html>\\n\" +\t        \"<html>\" +\t        \"<head>\" +\t        \"<meta http-equiv=\\\"Content-Type\\\" \" +\t        \"content=\\\"text/html;charset=utf-8\\\" >\" +\t        \"<title>Name Reference Graph Dump</title>\" +\t        \"<style type=\\\"text/css\\\">body, td, \");\t    builder.append(\"p {font-family: Arial; font-size: 83%} \");\t    builder.append(\"ul {margin-top:2px; margin-left:0px; padding-left:1em;}\");\t    builder.append(\"li {margin-top:3px; margin-left:24px;\" +\t        \"padding-left:0px;padding-bottom: 4px}\");\t    builder.append(\"</style></head><body>\\n\");\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(2)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.rhino.Node.propToString(int) is as follows.\nprivate static final String propToString(int propType) {\t      switch (propType) {\t        case LOCAL_BLOCK_PROP:   return \"local_block\";\t        case OBJECT_IDS_PROP:    return \"object_ids_prop\";\t        case CATCH_SCOPE_PROP:   return \"catch_scope_prop\";\t        case LABEL_ID_PROP:      return \"label_id_prop\";\t        case TARGET_PROP:        return \"target\";\t        case BREAK_PROP:         return \"break\";\t        case CONTINUE_PROP:      return \"continue\";\t        case ENUM_PROP:          return \"enum\";\t        case FUNCTION_PROP:      return \"function\";\t        case TEMP_PROP:          return \"temp\";\t        case LOCAL_PROP:         return \"local\";\t        case CODEOFFSET_PROP:    return \"codeoffset\";\t        case FIXUPS_PROP:        return \"fixups\";\t        case VARS_PROP:          return \"vars\";\t        case USES_PROP:          return \"uses\";\t        case REGEXP_PROP:        return \"regexp\";\t        case CASES_PROP:         return \"cases\";\t        case DEFAULT_PROP:       return \"default\";\t        case CASEARRAY_PROP:     return \"casearray\";\t        case SOURCENAME_PROP:    return \"sourcename\";\t        case TYPE_PROP:          return \"type\";\t        case SPECIAL_PROP_PROP:  return \"special_prop\";\t        case LABEL_PROP:         return \"label\";\t        case FINALLY_PROP:       return \"finally\";\t        case LOCALCOUNT_PROP:    return \"localcount\";\t\t        case TARGETBLOCK_PROP:   return \"targetblock\";\t        case VARIABLE_PROP:      return \"variable\";\t        case LASTUSE_PROP:       return \"lastuse\";\t        case ISNUMBER_PROP:      return \"isnumber\";\t        case DIRECTCALL_PROP:    return \"directcall\";\t\t        case SPECIALCALL_PROP:   return \"specialcall\";\t        case DEBUGSOURCE_PROP:   return \"debugsource\";\t\t        case JSDOC_INFO_PROP:    return \"jsdoc_info\";\t\t        case SKIP_INDEXES_PROP:  return \"skip_indexes\";\t        case INCRDECR_PROP:      return \"incrdecr\";\t        case MEMBER_TYPE_PROP:   return \"member_type\";\t        case NAME_PROP:          return \"name\";\t        case PARENTHESIZED_PROP: return \"parenthesized\";\t        case QUOTED_PROP:        return \"quoted\";\t\t        case SYNTHETIC_BLOCK_PROP: return \"synthetic\";\t        case EMPTY_BLOCK: return \"empty_block\";\t        case ORIGINALNAME_PROP: return \"originalname\";\t        case SIDE_EFFECT_FLAGS: return \"side_effect_flags\";\t\t        case IS_CONSTANT_NAME:   return \"is_constant_name\";\t        case IS_OPTIONAL_PARAM:  return \"is_optional_param\";\t        case IS_VAR_ARGS_PARAM:  return \"is_var_args_param\";\t        case IS_NAMESPACE:       return \"is_namespace\";\t        case IS_DISPATCHER:      return \"is_dispatcher\";\t        case DIRECTIVES:         return \"directives\";\t        case DIRECT_EVAL:        return \"direct_eval\";\t        case FREE_CALL:          return \"free_call\";\t        default:\t          Kit.codeBug();\t      }\t      return null;\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(3)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.rhino.Node.toStringTreeHelper(Node,int,Appendable) is as follows.\nprivate static void toStringTreeHelper(Node n, int level, Appendable sb)\t      throws IOException {\t    if (Token.printTrees) {\t      for (int i = 0; i != level; ++i) {\t        sb.append(\"    \");\t      }\t      sb.append(n.toString());\t      sb.append('\\n');\t      for (Node cursor = n.getFirstChild();\t           cursor != null;\t           cursor = cursor.getNext()) {\t        toStringTreeHelper(cursor, level + 1, sb);\t      }\t    }\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(4)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.TightenTypes.process(Node,Node) is as follows.\n@Override\t  public void process(Node externRoot, Node jsRoot) {\t    // Create the scope of top-level variables and functions.\t    topScope = new ConcreteScope(null);\t    topScope.initForExternRoot(externRoot);\t    topScope.initForScopeRoot(jsRoot);\t\t    // Process the assignments in each scope in the working set until no more\t    // changes are detected.  Each time a new scope is discovered (starting with\t    // the top-level scope), it is added to the working set to be processed.\t    // Since changes in almost any scope can affect another, we iterate over all\t    // discovered scopes until no further changes occur.\t\t    long maxIterations = 1000;\t    long iterations = 0;\t\t    Set<ConcreteScope> workSet = Sets.newHashSet(topScope);\t    List<ConcreteScope> workList = Lists.newArrayList(topScope);\t\t    boolean changed;\t    do {\t      changed = false;\t      for (int i = 0; i < workList.size(); ++i) {\t        ConcreteScope scope = workList.get(i);\t        for (Action action : scope.getActions()) {\t          for (Assignment assign : action.getAssignments(scope)) {\t            if (assign.slot.addConcreteType(assign.type)) {\t              changed = true;\t              ConcreteScope varScope = assign.slot.getScope();\t              if ((varScope != scope) && !workSet.contains(varScope)) {\t                workSet.add(varScope);\t                workList.add(varScope);\t              }\t            }\t          }\t        }\t      }\t      Preconditions.checkState(++iterations != maxIterations,\t          NON_HALTING_ERROR_MSG);\t    } while (changed);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(5)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.tryReduceReturn(Node) is as follows.\n/**\t   * Reduce \"return undefined\" or \"return void 0\" to simply \"return\".\t   *\t   * Returns the replacement for n, or the original if no change was made.\t   */\t  private Node tryReduceReturn(Node n) {\t    Node result = n.getFirstChild();\t\t    boolean possibleException = result != null &&\t        ControlFlowAnalysis.mayThrowException(result);\t\t    // Try to use a substitute that with a break because it is shorter.\t\t    // First lets pretend it is a break with no labels.\t    Node breakTarget = n;\t    boolean safe = true;\t\t    for (;!ControlFlowAnalysis.isBreakTarget(breakTarget, null /* no label */);\t        breakTarget = breakTarget.getParent()) {\t      if (NodeUtil.isFunction(breakTarget) ||\t          breakTarget.getType() == Token.SCRIPT) {\t\t          // We can switch the return to a break if the return value has\t          // side effect and it must encounter a finally.\t\t          // example: return alert('a') -> finally { alert('b') } ->\t          //          return alert('a')\t          // prints a then b. If the first return is a break,\t          // it prints b then a.\t        safe = false;\t        break;\t      }\t    }\t\t    Node follow = ControlFlowAnalysis.computeFollowNode(breakTarget);\t\t    // Skip pass all the finally blocks because both the break and return will\t    // also trigger all the finally blocks. However, the order of execution is\t    // slightly changed. Consider:\t    //\t    // return a() -> finally { b() } -> return a()\t    //\t    // which would call a() first. However, changing the first return to a\t    // break will result in calling b().\t    while (follow != null &&\t        NodeUtil.isTryFinallyNode(follow.getParent(), follow)) {\t      if (result != null &&\t          // TODO(user): Use the new side effects API for more accuracy.\t          (NodeUtil.canBeSideEffected(result) ||\t           NodeUtil.mayHaveSideEffects(result))) {\t        safe = false;\t        break;\t      }\t      follow = ControlFlowAnalysis.computeFollowNode(follow);\t    }\t\t    if (safe) {\t      if (follow == null) {\t        // When follow is null, this mean the follow of a break target is the\t        // end of a function. This means a break is same as return.\t        if (result == null) {\t          n.setType(Token.BREAK);\t          reportCodeChange();\t          return n;\t        }\t\t      } else if (follow.getType() == Token.RETURN &&\t          (result == follow.getFirstChild() ||\t           (result != null && follow.hasChildren() &&\t            result.checkTreeEqualsSilent(follow.getFirstChild())) &&\t            ControlFlowAnalysis.getExceptionHandler(n) ==\t            ControlFlowAnalysis.getExceptionHandler(follow)\t           )) {\t        // When the follow is a return, if both doesn't return anything\t        // or both returns the same thing. This mean we can replace it with a\t        // break.\t        n.removeChildren();\t        n.setType(Token.BREAK);\t        reportCodeChange();\t        return n;\t      }\t      // If any of the above is executed, we must return because n is no longer\t      // a \"return\" node.\t    }\t\t    // TODO(user): consider cases such as if (x) { return 1} return 1;\t\t    if (result != null) {\t      switch (result.getType()) {\t        case Token.VOID:\t          Node operand = result.getFirstChild();\t          if (!mayHaveSideEffects(operand)) {\t            n.removeFirstChild();\t            reportCodeChange();\t          }\t          break;\t        case Token.NAME:\t          String name = result.getString();\t          if (name.equals(\"undefined\")) {\t            n.removeFirstChild();\t            reportCodeChange();\t          }\t          break;\t        default:\t          //Do nothing\t            break;\t      }\t    }\t\t    return n;\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit"
+        },
+        {
+            "role": "user",
+            "content": "Please call functions in the right format `FunctionName(Argument)`.\nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\n"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(6)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isLowerPrecedenceInExpression(Node,int) is as follows.\n/**\t   * Does the expression contain an operator with lower precedence than\t   * the argument?\t   */\t  private boolean isLowerPrecedenceInExpression(Node n,\t      final int precedence) {\t    Predicate<Node> isLowerPrecedencePredicate = new Predicate<Node>() {\t      @Override\t      public boolean apply(Node input) {\t        return NodeUtil.precedence(input.getType()) < precedence;\t      }\t    };\t\t    return NodeUtil.has(n, isLowerPrecedencePredicate,\t        DONT_TRAVERSE_FUNCTIONS_PREDICATE);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(7)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isPropertyAssignmentInExpression(Node) is as follows.\n/**\t   * Does the expression contain a property assignment?\t   */\t  private boolean isPropertyAssignmentInExpression(Node n) {\t    Predicate<Node> isPropertyAssignmentInExpressionPredicate =\t        new Predicate<Node>() {\t      @Override\t      public boolean apply(Node input) {\t        return (input.getType() == Token.GETPROP &&\t            input.getParent().getType() == Token.ASSIGN);\t      }\t    };\t\t    return NodeUtil.has(n, isPropertyAssignmentInExpressionPredicate,\t        DONT_TRAVERSE_FUNCTIONS_PREDICATE);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(8)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isPropertyAssignmentInExpression(Node) is as follows.\n/**\t   * Does the expression contain a property assignment?\t   */\t  private boolean isPropertyAssignmentInExpression(Node n) {\t    Predicate<Node> isPropertyAssignmentInExpressionPredicate =\t        new Predicate<Node>() {\t      @Override\t      public boolean apply(Node input) {\t        return (input.getType() == Token.GETPROP &&\t            input.getParent().getType() == Token.ASSIGN);\t      }\t    };\t\t    return NodeUtil.has(n, isPropertyAssignmentInExpressionPredicate,\t        DONT_TRAVERSE_FUNCTIONS_PREDICATE);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(9)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.isLowerPrecedenceInExpression(Node,int) is as follows.\n/**\t   * Does the expression contain an operator with lower precedence than\t   * the argument?\t   */\t  private boolean isLowerPrecedenceInExpression(Node n,\t      final int precedence) {\t    Predicate<Node> isLowerPrecedencePredicate = new Predicate<Node>() {\t      @Override\t      public boolean apply(Node input) {\t        return NodeUtil.precedence(input.getType()) < precedence;\t      }\t    };\t\t    return NodeUtil.has(n, isLowerPrecedencePredicate,\t        DONT_TRAVERSE_FUNCTIONS_PREDICATE);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.tryReduceReturn(Node)\nTop_2 : com.google.javascript.rhino.Node.toStringTreeHelper(Node, int, Appendable)\nTop_3 : com.google.javascript.jscomp.TightenTypes.process(Node, Node)\nTop_4 : com.google.javascript.jscomp.NameReferenceGraphReport.generateHtmlReportHeader(StringBuilder)\nTop_5 : com.google.javascript.rhino.Node.propToString(int)"
+        }
+    ],
+    "fl_results": [
+        "com.google.javascript.jscomp.PeepholeSubstituteAlternateSyntax.tryReduceReturn(Node)",
+        "com.google.javascript.rhino.Node.toStringTreeHelper(Node,int,Appendable)",
+        "com.google.javascript.jscomp.TightenTypes.process(Node,Node)",
+        "com.google.javascript.jscomp.NameReferenceGraphReport.generateHtmlReportHeader(StringBuilder)",
+        "com.google.javascript.rhino.Node.propToString(int)"
+    ]
+}

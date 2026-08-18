@@ -1,0 +1,33 @@
+public void testParseSourceMetaMap() throws Exception {
+    final String INPUT1 = "file1";
+    final String INPUT2 = "file2";
+    LinkedHashMap<String, String> inputs = Maps.newLinkedHashMap();
+    inputs.put(INPUT1, "var __FOO__ = 1;");
+    inputs.put(INPUT2, "var __BAR__ = 2;");
+    RunResult result1 = compile(inputs.get(INPUT1), INPUT1);
+    RunResult result2 = compile(inputs.get(INPUT2), INPUT2);
+
+    final String MAP1 = "map1";
+    final String MAP2 = "map2";
+    final LinkedHashMap<String, String> maps = Maps.newLinkedHashMap();
+    maps.put(MAP1, result1.sourceMapFileContent);
+    maps.put(MAP2, result2.sourceMapFileContent);
+
+    List<SourceMapSection> sections = Lists.newArrayList();
+
+    StringBuilder output = new StringBuilder();
+    FilePosition offset = appendAndCount(output, result1.generatedSource);
+    sections.add(SourceMapSection.forURL(MAP1, 0, 0));
+    output.append(result2.generatedSource);
+    sections.add(
+        SourceMapSection.forURL(MAP2, offset.getLine(), offset.getColumn()));
+
+    SourceMapGeneratorV3 generator = new SourceMapGeneratorV3();
+    StringBuilder mapContents = new StringBuilder();
+    generator.appendIndexMapTo(mapContents, "out.js", sections);
+
+    check(inputs, output.toString(), mapContents.toString(),
+The last line shown above failed with the following stack trace.
+junit.framework.AssertionFailedError: expected:<5> but was:<4>
+	at com.google.debugging.sourcemap.SourceMapTestCase.check(SourceMapTestCase.java:252)
+	at com.google.debugging.sourcemap.SourceMapGeneratorV3Test.testParseSourceMetaMap(SourceMapGeneratorV3Test.java:450)

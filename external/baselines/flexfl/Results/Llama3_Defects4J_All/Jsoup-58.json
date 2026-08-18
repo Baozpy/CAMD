@@ -1,0 +1,87 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:Jsoup.isValid returns true even when htmlFragment includes tags not on whitelist\nDescription:\nCaused by Jsoup.isValid performing a destructive parse before testing for validity.  The html returned from parseBodyFragment is not what was passed in.\nAccording to documentation, html, head tags etc. should be specifically added to whitelist if they should be allowed.\nTest cases below.\npackage jsoup;\n\nimport junit.framework.Assert;\nimport org.jsoup.Jsoup;\nimport org.jsoup.nodes.Document;\nimport org.jsoup.parser.Parser;\nimport org.jsoup.safety.Cleaner;\nimport org.jsoup.safety.Whitelist;\nimport org.junit.Test;\nimport org.junit.runner.RunWith;\nimport org.junit.runners.Parameterized;\n\nimport java.util.Arrays;\nimport java.util.Collection;\n\n@RunWith(Parameterized.class)\npublic class JsoupTest\n{\n    private String htmlFragment;\n\n    public JsoupTest(String htmlFragment)\n    {\n        this.htmlFragment = htmlFragment;\n    }\n\n    @Parameterized.Parameters\n    public static Collection<String[]> dirtyHtml()\n    {\n        String[][] htmlFragments = new String[][] { {\"<html></html>\"},\n                                                    {\"<head></head>\"},\n                                                    {\"<body></body>\"}\n        };\n\n        return Arrays.asList(htmlFragments);\n    }\n\n    @Test\n    public void emptyWhitelistReturnsFalseForAllTags()\n    {\n        Assert.assertEquals(false, Jsoup.isValid(htmlFragment, new Whitelist()));\n    }\n\n    @Test\n    public void whitelistNoneReturnsFalseForAllTags()\n    {\n        Assert.assertEquals(false, Jsoup.isValid(htmlFragment, Whitelist.none()));\n    }\n\n    @Test\n    public void typicalWhitelistReturnsFalseForNonIncludedTags()\n    {\n        Whitelist whitelist = new Whitelist();\n        whitelist.addTags(\"p\");\n\n        Assert.assertEquals(false, Jsoup.isValid(htmlFragment, whitelist));\n    }\n\n    @Test\n    public void codeFromSource()\n    {\n        Document dirty = Parser.parseBodyFragment(htmlFragment, \"\");\n        Cleaner cleaner = new Cleaner(Whitelist.none());\n\n        Assert.assertEquals(false, cleaner.isValid(dirty));\n    }\n\n}\n\n\n```\nThe trigger test is as follows:\n```\npublic void testIsValidBodyHtml() {\n        String ok = \"<p>Test <b><a href='http://example.com/' rel='nofollow'>OK</a></b></p>\";\n        String ok1 = \"<p>Test <b><a href='http://example.com/'>OK</a></b></p>\"; // missing enforced is OK because still needs run thru cleaner\n        String nok1 = \"<p><script></script>Not <b>OK</b></p>\";\n        String nok2 = \"<p align=right>Test Not <b>OK</b></p>\";\n        String nok3 = \"<!-- comment --><p>Not OK</p>\"; // comments and the like will be cleaned\n        String nok4 = \"<html><head>Foo</head><body><b>OK</b></body></html>\"; // not body html\n        String nok5 = \"<p>Test <b><a href='http://example.com/' rel='nofollowme'>OK</a></b></p>\";\n        String nok6 = \"<p>Test <b><a href='http://example.com/'>OK</b></p>\"; // missing close tag\n        String nok7 = \"</div>What\";\n        assertTrue(Jsoup.isValid(ok, Whitelist.basic()));\n        assertTrue(Jsoup.isValid(ok1, Whitelist.basic()));\n        assertFalse(Jsoup.isValid(nok1, Whitelist.basic()));\n        assertFalse(Jsoup.isValid(nok2, Whitelist.basic()));\n        assertFalse(Jsoup.isValid(nok3, Whitelist.basic()));\n        assertFalse(Jsoup.isValid(nok4, Whitelist.basic()));\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError\n\tat org.jsoup.safety.CleanerTest.testIsValidBodyHtml(CleanerTest.java:160)\n```\nThe suggested methods are as follows:\n```\n1.org.jsoup.Jsoup.isValid(String,Whitelist)\n2.org.jsoup.safety.Cleaner.isValid(Document)\n3.org.jsoup.Jsoup.clean(String,String,Whitelist,Document.OutputSettings)\n4.org.jsoup.safety.Whitelist.isSafeAttribute(String,Element,Attribute)\n5.org.jsoup.nodes.Entities.getByName(String)\n6.org.jsoup.safety.Cleaner.isValid(Document)\n7.org.jsoup.nodes.Entities.getByName(String)\n8.org.jsoup.parser.Token.Tag.getAttributes()\n9.org.jsoup.Jsoup.isValid(String,Whitelist)\n10.org.jsoup.safety.Whitelist.addProtocols(String,String,String)\n11.org.jsoup.Jsoup.isValid(String,Whitelist)\n12.org.jsoup.Jsoup.clean(String,String,Whitelist,Document.OutputSettings)\n13.org.jsoup.Jsoup.clean(String,String,Whitelist)\n14.org.jsoup.Jsoup.clean(String,Whitelist)\n15.org.jsoup.safety.Cleaner.isValid(Document)\n16.org.jsoup.Jsoup.parseBodyFragment(String,String)\n17.org.jsoup.safety.Cleaner.isValid(Document)\n18.org.jsoup.Jsoup.isValid(String,Whitelist)\n19.org.jsoup.parser.Parser.parseBodyFragment(String,String)\n20.org.jsoup.safety.Cleaner.Cleaner(Whitelist)\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can infer that the issue is with the `Jsoup.isValid` method, specifically when it is called with a whitelist that does not include all the allowed tags. The bug report mentions that the method performs a destructive parse before testing for validity, which suggests that the issue is with the parsing process.\n\nGiven the 20 suggested methods, I will start by focusing on the methods that are related to parsing and whitelisting. Here's my plan:\n\n1. Call `get_code_snippet_of_method(1)` to get the code snippet of the `Jsoup.isValid` method.\n2. Analyze the code snippet to understand how the method works and what it does.\n3. Call `get_code_snippet_of_method(16)` to get the code snippet of the `Jsoup.parseBodyFragment` method, which is called by `Jsoup.isValid`.\n4. Analyze the code snippet of `Jsoup.parseBodyFragment` to understand how it parses the input HTML fragment.\n5. Call `get_code_snippet_of_method(3)` to get the code snippet of the `Jsoup.clean` method, which is used by `Jsoup.parseBodyFragment`.\n6. Analyze the code snippet of `Jsoup.clean` to understand how it cleans the input HTML fragment.\n7. Call `get_code_snippet_of_method(2)` to get the code snippet of the `Cleaner.isValid` method, which is used by `Jsoup.clean`.\n8. Analyze the code snippet of `Cleaner.isValid` to understand how it checks the validity of the cleaned HTML fragment.\n\nBy analyzing these code snippets, I should be able to identify the faulty method and understand the root cause of the issue.\n\nPlease let me know if I can proceed with the next step."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.Jsoup.isValid(String,Whitelist) is as follows.\n/**\t     Test if the input body HTML has only tags and attributes allowed by the Whitelist. Useful for form validation.\t     <p>The input HTML should still be run through the cleaner to set up enforced attributes, and to tidy the output.\t     <p>Assumes the HTML is a body fragment (i.e. will be used in an existing HTML document body.)\t     @param bodyHtml HTML to test\t     @param whitelist whitelist to test against\t     @return true if no tags or attributes were removed; false otherwise\t     @see #clean(String, org.jsoup.safety.Whitelist) \t     */\t    public static boolean isValid(String bodyHtml, Whitelist whitelist) {\t        return new Cleaner(whitelist).isValid(parseBodyFragment(bodyHtml, \"\"));\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.Jsoup.parseBodyFragment(String,String) is as follows.\n/**\t     Parse a fragment of HTML, with the assumption that it forms the {@code body} of the HTML.\t\t     @param bodyHtml body HTML fragment\t     @param baseUri  URL to resolve relative URLs against.\t     @return sane HTML document\t\t     @see Document#body()\t     */\t    public static Document parseBodyFragment(String bodyHtml, String baseUri) {\t        return Parser.parseBodyFragment(bodyHtml, baseUri);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(19)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.Parser.parseBodyFragment(String,String) is as follows.\n/**\t     * Parse a fragment of HTML into the {@code body} of a Document.\t     *\t     * @param bodyHtml fragment of HTML\t     * @param baseUri base URI of document (i.e. original fetch location), for resolving relative URLs.\t     *\t     * @return Document, with empty head, and HTML parsed into body\t     */\t    public static Document parseBodyFragment(String bodyHtml, String baseUri) {\t        Document doc = Document.createShell(baseUri);\t        Element body = doc.body();\t        List<Node> nodeList = parseFragment(bodyHtml, body, baseUri);\t        Node[] nodes = nodeList.toArray(new Node[nodeList.size()]); // the node list gets modified when re-parented\t        for (int i = nodes.length - 1; i > 0; i--) {\t            nodes[i].remove();\t        }\t        for (Node node : nodes) {\t            body.appendChild(node);\t        }\t        return doc;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(2)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.safety.Cleaner.isValid(Document) is as follows.\n/**\t     Determines if the input document <b>body</b>is valid, against the whitelist. It is considered valid if all the tags and attributes\t     in the input HTML are allowed by the whitelist, and that there is no content in the <code>head</code>.\t     <p>\t     This method can be used as a validator for user input. An invalid document will still be cleaned successfully\t     using the {@link #clean(Document)} document. If using as a validator, it is recommended to still clean the document\t     to ensure enforced attributes are set correctly, and that the output is tidied.\t     </p>\t     @param dirtyDocument document to test\t     @return true if no tags or attributes need to be removed; false if they do\t     */\t    public boolean isValid(Document dirtyDocument) {\t        Validate.notNull(dirtyDocument);\t\t        Document clean = Document.createShell(dirtyDocument.baseUri());\t        int numDiscarded = copySafeNodes(dirtyDocument.body(), clean.body());\t        return numDiscarded == 0;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.jsoup.Jsoup.parseBodyFragment(String, String)\nTop_2 : org.jsoup.parser.Parser.parseBodyFragment(String, String)\nTop_3 : org.jsoup.Jsoup.isValid(String, Whitelist)\nTop_4 : org.jsoup.safety.Cleaner.isValid(Document)\nTop_5 : org.jsoup.Jsoup.clean(String, Whitelist)"
+        }
+    ],
+    "fl_results": [
+        "org.jsoup.Jsoup.parseBodyFragment(String,String)",
+        "org.jsoup.parser.Parser.parseBodyFragment(String,String)",
+        "org.jsoup.Jsoup.isValid(String,Whitelist)",
+        "org.jsoup.safety.Cleaner.isValid(Document)",
+        "org.jsoup.Jsoup.clean(String,Whitelist)"
+    ]
+}

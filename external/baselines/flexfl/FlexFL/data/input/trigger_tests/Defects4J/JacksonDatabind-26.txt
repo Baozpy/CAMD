@@ -1,0 +1,27 @@
+public void testEnumHandlers() throws IOException
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        // ensure we have serializers and/or deserializers, first
+        String json = mapper.writerFor(EnumPOJO.class)
+                .writeValueAsString(new EnumPOJO());
+        EnumPOJO result = mapper.readerFor(EnumPOJO.class)
+                .readValue(json);
+        assertNotNull(result);
+
+        // and then use JDK serialization to freeze/thaw objects
+        byte[] bytes = jdkSerialize(mapper);
+        ObjectMapper mapper2 = jdkDeserialize(bytes);
+        assertNotNull(mapper2);
+
+        bytes = jdkSerialize(mapper.readerFor(EnumPOJO.class));
+        ObjectReader r = jdkDeserialize(bytes);
+        assertNotNull(r);
+
+        /* 14-Aug-2015, tatu: Looks like pre-loading JsonSerializer is problematic
+         *    at this point; comment out for now. Try to fix later on.
+         */
+        bytes = jdkSerialize(mapper.writerFor(EnumPOJO.class));
+The last line shown above failed with the following stack trace.
+java.io.NotSerializableException: com.fasterxml.jackson.databind.ser.BeanPropertyWriter
+	at com.fasterxml.jackson.databind.TestJDKSerialization.jdkSerialize(TestJDKSerialization.java:179)
+	at com.fasterxml.jackson.databind.TestJDKSerialization.testEnumHandlers(TestJDKSerialization.java:93)

@@ -1,0 +1,58 @@
+public void testIssue744() throws IOException
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(DataA.class, new DataADeserializer());
+        mapper.registerModule(module);
+
+        DataB db = new DataB();
+        db.da.i = 11;
+        db.k = 13;
+        String jsonBString = mapper.writeValueAsString(db);
+        JsonNode jsonBNode = mapper.valueToTree(db);
+
+        // create parent
+        DataB dbNewViaString = mapper.readValue(jsonBString, DataB.class);
+        assertEquals(5, dbNewViaString.da.i);
+        assertEquals(13, dbNewViaString.k);
+
+        DataB dbNewViaNode = mapper.treeToValue(jsonBNode, DataB.class);
+        assertEquals(5, dbNewViaNode.da.i);
+        assertEquals(13, dbNewViaNode.k);
+
+        // update parent
+        DataB dbUpdViaString = new DataB();
+        DataB dbUpdViaNode = new DataB();
+
+        assertEquals(1, dbUpdViaString.da.i);
+        assertEquals(3, dbUpdViaString.k);
+        mapper.readerForUpdating(dbUpdViaString).readValue(jsonBString);
+        assertEquals(5, dbUpdViaString.da.i);
+        assertEquals(13, dbUpdViaString.k);
+
+        assertEquals(1, dbUpdViaNode.da.i);
+        assertEquals(3, dbUpdViaNode.k);
+        
+        mapper.readerForUpdating(dbUpdViaNode).readValue(jsonBNode);
+The last line shown above failed with the following stack trace.
+com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "i" (class com.fasterxml.jackson.databind.convert.TestUpdateValue$DataB), not marked as ignorable (2 known properties: "da", "k"])
+ at [Source: N/A; line: -1, column: -1] (through reference chain: com.fasterxml.jackson.databind.convert.DataB["da"]->com.fasterxml.jackson.databind.convert.DataB["i"])
+	at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:51)
+	at com.fasterxml.jackson.databind.DeserializationContext.reportUnknownProperty(DeserializationContext.java:817)
+	at com.fasterxml.jackson.databind.deser.std.StdDeserializer.handleUnknownProperty(StdDeserializer.java:958)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.handleUnknownProperty(BeanDeserializerBase.java:1324)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.handleUnknownVanilla(BeanDeserializerBase.java:1302)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.vanillaDeserialize(BeanDeserializer.java:249)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:136)
+	at com.fasterxml.jackson.databind.ObjectReader._bindAsTree(ObjectReader.java:1480)
+	at com.fasterxml.jackson.databind.ObjectReader.readTree(ObjectReader.java:1022)
+	at com.fasterxml.jackson.core.JsonParser.readValueAsTree(JsonParser.java:1465)
+	at com.fasterxml.jackson.databind.convert.TestUpdateValue$DataADeserializer.deserialize(TestUpdateValue.java:76)
+	at com.fasterxml.jackson.databind.convert.TestUpdateValue$DataADeserializer.deserialize(TestUpdateValue.java:63)
+	at com.fasterxml.jackson.databind.deser.SettableBeanProperty.deserialize(SettableBeanProperty.java:523)
+	at com.fasterxml.jackson.databind.deser.impl.FieldProperty.deserializeAndSet(FieldProperty.java:101)
+	at com.fasterxml.jackson.databind.deser.impl.BeanPropertyMap.findDeserializeAndSet(BeanPropertyMap.java:285)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:220)
+	at com.fasterxml.jackson.databind.ObjectReader._bindAndClose(ObjectReader.java:1445)
+	at com.fasterxml.jackson.databind.ObjectReader.readValue(ObjectReader.java:1156)
+	at com.fasterxml.jackson.databind.convert.TestUpdateValue.testIssue744(TestUpdateValue.java:222)

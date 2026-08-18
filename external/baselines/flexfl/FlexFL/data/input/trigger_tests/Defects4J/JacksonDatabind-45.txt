@@ -1,0 +1,26 @@
+public void testDateDefaultShape() throws Exception
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        // No @JsonFormat => default to user config
+        mapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        String json = mapper.writeValueAsString(new DateAsDefaultBean(0L));
+        assertEquals(aposToQuotes("{'date':0}"), json);
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        json = mapper.writeValueAsString(new DateAsDefaultBean(0L));
+        assertEquals(aposToQuotes("{'date':'1970-01-01T00:00:00.000+0000'}"), json);
+
+        // Empty @JsonFormat => default to user config
+        mapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        json = mapper.writeValueAsString(new DateAsDefaultBeanWithEmptyJsonFormat(0L));
+        assertEquals(aposToQuotes("{'date':0}"), json);
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        json = mapper.writeValueAsString(new DateAsDefaultBeanWithEmptyJsonFormat(0L));
+        assertEquals(aposToQuotes("{'date':'1970-01-01T00:00:00.000+0000'}"), json);
+
+        // @JsonFormat with Shape.ANY and pattern => STRING shape, regardless of user config
+        mapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        json = mapper.writeValueAsString(new DateAsDefaultBeanWithPattern(0L));
+        assertEquals(aposToQuotes("{'date':'1970-01-01'}"), json);
+The last line shown above failed with the following stack trace.
+junit.framework.ComparisonFailure: expected:<{"date":["1970-01-01"]}> but was:<{"date":[0]}>
+	at com.fasterxml.jackson.databind.ser.DateSerializationTest.testDateDefaultShape(DateSerializationTest.java:288)

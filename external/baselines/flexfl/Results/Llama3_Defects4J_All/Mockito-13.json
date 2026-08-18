@@ -1,0 +1,99 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:fix proposal for #114\nDescription:\n@bric3, can you take a look at this one? If you don't have time I'll just merge it. All existing tests are passing.\nThanks for the fix!!!\n\n```\nThe trigger test is as follows:\n```\npublic void shouldAllowVerifyingWhenOtherMockCallIsInTheSameLine() {\n        //given\n        when(mock.otherMethod()).thenReturn(\"foo\");\n        \n        //when\n        mockTwo.simpleMethod(\"foo\");\n        \n        //then\n        verify(mockTwo).simpleMethod(mock.otherMethod());\n        try {\n            verify(mockTwo, never()).simpleMethod(mock.otherMethod());\n            fail();\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError\n\tat org.mockitousage.bugs.VerifyingWithAnExtraCallToADifferentMockTest.shouldAllowVerifyingWhenOtherMockCallIsInTheSameLine(VerifyingWithAnExtraCallToADifferentMockTest.java:33)\n```\nThe suggested methods are as follows:\n```\n1.org.mockito.Mockito.never()\n2.org.mockito.Mockito.verify(T,VerificationMode)\n3.org.mockito.internal.stubbing.BaseStubbing.thenReturn(T)\n4.org.mockito.internal.creation.jmock.ClassImposterizer.createProxyClass(Class<?>,Class<?>)\n5.org.mockito.exceptions.Reporter.cannotVerifyToString()\n6.org.mockito.Mockito.never()\n7.org.mockito.Mockito.verify(T,VerificationMode)\n8.org.mockito.internal.stubbing.BaseStubbing.thenReturn(T)\n9.org.mockito.internal.stubbing.answers.Returns.answer(InvocationOnMock)\n10.org.mockito.internal.stubbing.answers.Returns.getReturnType()\n11.org.mockito.exceptions.Reporter.nullPassedToVerify()\n12.org.mockito.Mockito.validateMockitoUsage()\n13.org.mockito.Mockito.spy(T)\n14.org.mockito.Mockito.inOrder(Object)\n15.org.mockito.Mockito.timeout(int)\n16.org.mockito.exceptions.verification.junit.ArgumentsAreDifferent.ArgumentsAreDifferent(String,String,String)\n17.org.mockito.internal.invocation.realmethod.CGLIBProxyRealMethod.invoke(Object,Object[])\n18.org.mockito.internal.invocation.realmethod.CGLIBProxyRealMethod.invoke(Object,Object[])\n19.org.mockito.internal.invocation.realmethod.CGLIBProxyRealMethod.invoke(Object,Object[])\n20.org.mockito.internal.invocation.realmethod.CGLIBProxyRealMethod.invoke(Object,Object[])\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can infer that the issue is related to verifying a mock object's behavior. The test is trying to verify that a certain method was not called, but it's failing.\n\nGiven the suggested methods, I'm going to focus on the ones that are related to mocking and verification. Here's my plan:\n\n1. I'll start by looking at the methods that are related to verification, such as `org.mockito.Mockito.never()` and `org.mockito.Mockito.verify(T,VerificationMode)`. These methods are used to verify the behavior of mock objects.\n2. I'll also look at the methods that are related to mocking, such as `org.mockito.Mockito.spy(T)` and `org.mockito.Mockito.inOrder(Object)`. These methods are used to create and configure mock objects.\n3. I'll examine the code snippets of the methods that I suspect are related to the issue. I'll use the `get_code_snippet_of_method()` function to retrieve the code snippets.\n\nBased on this plan, I'll start by calling `get_code_snippet_of_method(2)` and `get_code_snippet_of_method(7)` to examine the code snippets of `org.mockito.Mockito.never()` and `org.mockito.Mockito.verify(T,VerificationMode)`."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(2)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.Mockito.verify(T,VerificationMode) is as follows.\n/**\t     * Verifies certain behavior happened at least once / exact number of times / never. E.g:\t     * <pre>\t     *   verify(mock, times(5)).someMethod(\"was called five times\");\t     *\t     *   verify(mock, atLeast(2)).someMethod(\"was called at least two times\");\t     *\t     *   //you can use flexible argument matchers, e.g:\t     *   verify(mock, atLeastOnce()).someMethod(<b>anyString()</b>);\t     * </pre>\t     *\t     * <b>times(1) is the default</b> and can be omitted\t     * <p>\t     * Arguments passed are compared using equals() method.\t     * Read about {@link ArgumentCaptor} or {@link ArgumentMatcher} to find out other ways of matching / asserting arguments passed.\t     * <p>\t     *\t     * @param mock to be verified\t     * @param mode times(x), atLeastOnce() or never()\t     *\t     * @return mock object itself\t     */\t    public static <T> T verify(T mock, VerificationMode mode) {\t        return MOCKITO_CORE.verify(mock, mode);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(7)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.Mockito.verify(T,VerificationMode) is as follows.\n/**\t     * Verifies certain behavior happened at least once / exact number of times / never. E.g:\t     * <pre>\t     *   verify(mock, times(5)).someMethod(\"was called five times\");\t     *\t     *   verify(mock, atLeast(2)).someMethod(\"was called at least two times\");\t     *\t     *   //you can use flexible argument matchers, e.g:\t     *   verify(mock, atLeastOnce()).someMethod(<b>anyString()</b>);\t     * </pre>\t     *\t     * <b>times(1) is the default</b> and can be omitted\t     * <p>\t     * Arguments passed are compared using equals() method.\t     * Read about {@link ArgumentCaptor} or {@link ArgumentMatcher} to find out other ways of matching / asserting arguments passed.\t     * <p>\t     *\t     * @param mock to be verified\t     * @param mode times(x), atLeastOnce() or never()\t     *\t     * @return mock object itself\t     */\t    public static <T> T verify(T mock, VerificationMode mode) {\t        return MOCKITO_CORE.verify(mock, mode);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(3)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.stubbing.BaseStubbing.thenReturn(T) is as follows.\npublic OngoingStubbing<T> thenReturn(T value) {\t        return thenAnswer(new Returns(value));\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.Mockito.never() is as follows.\n/**\t     * Alias to times(0), see {@link Mockito#times(int)}\t     * <p>\t     * Verifies that interaction did not happen. E.g:\t     * <pre>\t     *   verify(mock, never()).someMethod();\t     * </pre>\t     * \t     * <p>\t     * If you want to verify there were NO interactions with the mock \t     * check out {@link Mockito#verifyZeroInteractions(Object...)}\t     * or {@link Mockito#verifyNoMoreInteractions(Object...)}\t     * <p>\t     * See examples in javadoc for {@link Mockito} class\t     * \t     * @return verification mode\t     */\t    public static VerificationMode never() {\t        return times(0);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.exceptions.verification.junit.ArgumentsAreDifferent.ArgumentsAreDifferent(String,String,String) is as follows.\npublic ArgumentsAreDifferent(String message, String wanted, String actual) {\t        super(message, wanted, actual);\t        this.message = message;\t        \t        unfilteredStackTrace = getStackTrace();\t        ConditionalStackTraceFilter filter = new ConditionalStackTraceFilter();\t        filter.filter(this);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.mockito.Mockito.verify(T, VerificationMode)\nTop_2 : org.mockito.Mockito.never()\nTop_3 : org.mockito.internal.stubbing.BaseStubbing.thenReturn(T)\nTop_4 : org.mockito.Mockito.verify(T, VerificationMode)\nTop_5 : org.mockito.exceptions.verification.junit.ArgumentsAreDifferent.ArgumentsAreDifferent(String, String, String)"
+        }
+    ],
+    "fl_results": [
+        "org.mockito.Mockito.verify(T,VerificationMode)",
+        "org.mockito.Mockito.never()",
+        "org.mockito.internal.stubbing.BaseStubbing.thenReturn(T)",
+        "org.mockito.Mockito.verify(T,VerificationMode)",
+        "org.mockito.exceptions.verification.junit.ArgumentsAreDifferent.ArgumentsAreDifferent(String,String,String)"
+    ]
+}

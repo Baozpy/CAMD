@@ -1,0 +1,31 @@
+public void doesntWriteDataDescriptorWhenAddingRawEntries() throws IOException {
+        ByteArrayOutputStream init = new ByteArrayOutputStream();
+        try (ZipArchiveOutputStream zos = new ZipArchiveOutputStream(init)) {
+            zos.putArchiveEntry(new ZipArchiveEntry("test1.txt"));
+            zos.write("foo".getBytes("UTF-8"));
+            zos.closeArchiveEntry();
+        }
+
+        File f = new File(dir, "test.zip");
+        try (FileOutputStream fos = new FileOutputStream(f)) {
+            fos.write(init.toByteArray());
+        }
+
+        ByteArrayOutputStream o = new ByteArrayOutputStream();
+        ZipArchiveEntry zae;
+        try (ZipFile zf = new ZipFile(f);
+             ZipArchiveOutputStream zos = new ZipArchiveOutputStream(o)) {
+            zae = zf.getEntry("test1.txt");
+            zos.addRawArchiveEntry(zae, zf.getRawInputStream(zae));
+        }
+
+        byte[] data = o.toByteArray();
+        byte[] versionInLFH = Arrays.copyOfRange(data, 4, 6);
+        // still 2.0 because of Deflate
+        assertArrayEquals(new byte[] { 20, 0 }, versionInLFH);
+        byte[] gpbInLFH = Arrays.copyOfRange(data, 6, 8);
+        // no DD but EFS flag
+        assertArrayEquals(new byte[] { 0, 8 }, gpbInLFH);
+The last line shown above failed with the following stack trace.
+junit.framework.AssertionFailedError: arrays first differed at element [0]; expected:<0> but was:<8>
+	at org.apache.commons.compress.archivers.zip.DataDescriptorTest.doesntWriteDataDescriptorWhenAddingRawEntries(DataDescriptorTest.java:162)

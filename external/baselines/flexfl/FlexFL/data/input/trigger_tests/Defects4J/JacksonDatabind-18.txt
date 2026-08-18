@@ -1,0 +1,30 @@
+public void testSimpleRootRecovery() throws Exception
+    {
+        final String JSON = aposToQuotes("{'a':3}{'a':27,'foo':[1,2],'b':{'x':3}}  {'a':1,'b':2} ");
+
+        MappingIterator<Bean> it = MAPPER.readerFor(Bean.class).readValues(JSON);
+        Bean bean = it.nextValue();
+
+        assertNotNull(bean);
+        assertEquals(3, bean.a);
+
+        // second one problematic
+        try {
+            it.nextValue();
+        } catch (JsonMappingException e) {
+            verifyException(e, "Unrecognized field \"foo\"");
+        }
+
+        // but should recover nicely
+        bean = it.nextValue();
+The last line shown above failed with the following stack trace.
+com.fasterxml.jackson.databind.JsonMappingException: Can not instantiate value of type [simple type, class com.fasterxml.jackson.databind.seq.ReadRecoveryTest$Bean] from Integral number (1); no single-int-arg constructor/factory method
+ at [Source: {"a":3}{"a":27,"foo":[1,2],"b":{"x":3}}  {"a":1,"b":2} ; line: 1, column: 23]
+	at com.fasterxml.jackson.databind.JsonMappingException.from(JsonMappingException.java:148)
+	at com.fasterxml.jackson.databind.DeserializationContext.mappingException(DeserializationContext.java:860)
+	at com.fasterxml.jackson.databind.deser.std.StdValueInstantiator.createFromInt(StdValueInstantiator.java:304)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.deserializeFromNumber(BeanDeserializerBase.java:1134)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeOther(BeanDeserializer.java:145)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:134)
+	at com.fasterxml.jackson.databind.MappingIterator.nextValue(MappingIterator.java:249)
+	at com.fasterxml.jackson.databind.seq.ReadRecoveryTest.testSimpleRootRecovery(ReadRecoveryTest.java:67)

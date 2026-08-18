@@ -1,0 +1,29 @@
+public void testIssue695() {
+
+        FirstOrderDifferentialEquations equation = new FirstOrderDifferentialEquations() {
+            
+            public int getDimension() {
+                return 1;
+            }
+            
+            public void computeDerivatives(double t, double[] y, double[] yDot) {
+                yDot[0] = 1.0;
+            }
+        };
+
+        DormandPrince853Integrator integrator = new DormandPrince853Integrator(0.001, 1000, 1.0e-14, 1.0e-14);
+        integrator.addEventHandler(new ResettingEvent(10.99), 0.1, 1.0e-9, 1000);
+        integrator.addEventHandler(new ResettingEvent(11.01), 0.1, 1.0e-9, 1000);
+        integrator.setInitialStepSize(3.0);
+
+        double target = 30.0;
+        double[] y = new double[1];
+        double tEnd = integrator.integrate(equation, 0.0, y, target, y);
+The last line shown above failed with the following stack trace.
+junit.framework.AssertionFailedError: going backard in time! (7.796578226186635 < 10.99)
+	at org.apache.commons.math.ode.events.EventStateTest$ResettingEvent.g(EventStateTest.java:120)
+	at org.apache.commons.math.ode.events.EventState.evaluateStep(EventState.java:214)
+	at org.apache.commons.math.ode.AbstractIntegrator.acceptStep(AbstractIntegrator.java:302)
+	at org.apache.commons.math.ode.nonstiff.EmbeddedRungeKuttaIntegrator.integrate(EmbeddedRungeKuttaIntegrator.java:296)
+	at org.apache.commons.math.ode.AbstractIntegrator.integrate(AbstractIntegrator.java:213)
+	at org.apache.commons.math.ode.events.EventStateTest.testIssue695(EventStateTest.java:100)

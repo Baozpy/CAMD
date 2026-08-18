@@ -1,0 +1,87 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:Issue with &lt;tr&gt;\nDescription:\nWhen calling append to add a table row the resulting tr gets wrapped in a table even though I appended to an existing table.\n\n```\nThe trigger test is as follows:\n```\npublic void testAppendRowToTable() {\n        Document doc = Jsoup.parse(\"<table><tr><td>1</td></tr></table>\");\n        Element table = doc.select(\"table\").first();\n        table.append(\"<tr><td>2</td></tr>\");\n\n        assertEquals(\"<table><tr><td>1</td></tr><tr><td>2</td></tr></table>\", TextUtil.stripNewlines(doc.body().html()));\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError: expected:<...tr><td>1</td></tr><t[r><td>2</td></tr]></table>> but was:<...tr><td>1</td></tr><t[able><tr><td>2</td></tr></table]></table>>\n\tat org.jsoup.nodes.ElementTest.testAppendRowToTable(ElementTest.java:219)\n```\nThe suggested methods are as follows:\n```\n1.org.jsoup.parser.Parser.addChildToParent(Element,boolean)\n2.org.jsoup.nodes.Element.prepend(String)\n3.org.jsoup.nodes.TextNode.outerHtml(StringBuilder)\n4.org.jsoup.parser.Parser.parse()\n5.org.jsoup.nodes.Element.append(String)\n6.org.jsoup.nodes.Node.siblingIndex()\n7.org.jsoup.nodes.Element.prepend(String)\n8.org.jsoup.nodes.Element.append(String)\n9.org.jsoup.nodes.TextNode.outerHtml(StringBuilder)\n10.org.jsoup.nodes.Node.nodeDepth()\n11.org.jsoup.safety.Whitelist.relaxed()\n12.org.jsoup.parser.TokenQueue.consumeCssIdentifier()\n13.org.jsoup.nodes.Element.wrap(String)\n14.org.jsoup.nodes.Document.normalise()\n15.org.jsoup.select.Elements.append(String)\n16.org.jsoup.nodes.Element.append(String)\n17.org.jsoup.parser.Parser.parseBodyFragment(String,String)\n18.org.jsoup.nodes.Element.appendChild(Node)\n19.org.jsoup.nodes.Element.val(String)\n20.org.jsoup.nodes.Element.toString()\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, it seems that the issue is with the `append` method of the `Element` class in Jsoup. The test is trying to append a new table row to an existing table, but the resulting HTML is not as expected. The expected HTML is \"<table><tr><td>1</td></tr><tr><td>2</td></tr></table>\", but the actual HTML is \"<table><tr><td>1</td></tr><table><tr><td>2</td></tr></table>\".\n\nFrom the trigger test, we can see that the `append` method is being called on an `Element` object, which is a table element. The method is being called with a string argument that represents the new table row.\n\nBased on this information, I would plan to investigate the following methods:\n\n1. `org.jsoup.nodes.Element.append(String)`: This is the method that is being called in the trigger test, and it seems to be the most likely culprit.\n2. `org.jsoup.parser.Parser.addChildToParent(Element, boolean)`: This method is responsible for adding a child element to a parent element. It's possible that this method is being called internally by the `append` method, and it's causing the issue.\n3. `org.jsoup.parser.Parser.parse()`: This method is responsible for parsing HTML, and it's possible that it's being called internally by the `append` method, and it's causing the issue.\n\nI would start by calling `get_code_snippet_of_method(1)` to get the code snippet of the `Element.append(String)` method, and then examine the code to see if it's doing anything unexpected. If that doesn't reveal the issue, I would call `get_code_snippet_of_method(2)` and `get_code_snippet_of_method(3)` to see if they're being called internally by the `append` method, and if so, what they're doing."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.Parser.addChildToParent(Element,boolean) is as follows.\nprivate Element addChildToParent(Element child, boolean isEmptyElement) {\t        Element parent = popStackToSuitableContainer(child.tag());\t        Tag childTag = child.tag();\t        boolean validAncestor = stackHasValidParent(childTag);\t\t        if (!validAncestor) {\t            // create implicit parent around this child\t            Tag parentTag = childTag.getImplicitParent();\t            Element implicit = new Element(parentTag, baseUri);\t            // special case: make sure there's a head before putting in body\t            if (child.tag().equals(bodyTag)) {\t                Element head = new Element(headTag, baseUri);\t                implicit.appendChild(head);\t            }\t            implicit.appendChild(child);\t\t            // recurse to ensure somewhere to put parent\t            Element root = addChildToParent(implicit, false);\t            if (!isEmptyElement)\t                stack.addLast(child);\t            return root;\t        }\t\t        parent.appendChild(child);\t\t        if (!isEmptyElement)\t            stack.addLast(child);\t        return parent;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(2)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.nodes.Element.prepend(String) is as follows.\n/**\t     * Add inner HTML to this element. The supplied HTML will be parsed, and each node prepended to the start of the children.\t     * @param html HTML to add inside this element, before the existing HTML\t     * @return this element\t     * @see #html(String)\t     */\t    public Element prepend(String html) {\t        Validate.notNull(html);\t        \t        Element fragment = Parser.parseBodyFragment(html, baseUri).body();\t        List<Node> nodes = fragment.childNodes();\t        for (int i = nodes.size() - 1; i >= 0; i--) {\t            Node node = nodes.get(i);\t            node.parentNode = null;\t            prependChild(node);\t        }\t        return this;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.nodes.Element.append(String) is as follows.\n/**\t     * Add inner HTML to this element. The supplied HTML will be parsed, and each node appended to the end of the children.\t     * @param html HTML to add inside this element, after the existing HTML\t     * @return this element\t     * @see #html(String)\t     */\t    public Element append(String html) {\t        Validate.notNull(html);\t        \t        Element fragment = Parser.parseBodyFragment(html, baseUri).body();\t        for (Node node : fragment.childNodes()) {\t            node.parentNode = null;\t            appendChild(node);\t        }\t        return this;\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(3)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.nodes.TextNode.outerHtml(StringBuilder) is as follows.\nvoid outerHtml(StringBuilder accum) {\t        String html = StringEscapeUtils.escapeHtml(getWholeText());\t        if (parent() instanceof Element && !((Element) parent()).preserveWhitespace()) {\t            html = normaliseWhitespace(html);\t        }\t\t        if (!isBlank() && parentNode instanceof Element && ((Element) parentNode).tag().canContainBlock()  && siblingIndex() == 0)\t            indent(accum);\t        accum.append(html);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.jsoup.nodes.Element.append(String)\nTop_2 : org.jsoup.parser.Parser.addChildToParent(Element, boolean)\nTop_3 : org.jsoup.nodes.Element.prepend(String)\nTop_4 : org.jsoup.nodes.Element.append(String)\nTop_5 : org.jsoup.parser.Parser.parseBodyFragment(String, String)"
+        }
+    ],
+    "fl_results": [
+        "org.jsoup.nodes.Element.append(String)",
+        "org.jsoup.parser.Parser.addChildToParent(Element,boolean)",
+        "org.jsoup.nodes.Element.prepend(String)",
+        "org.jsoup.nodes.Element.append(String)",
+        "org.jsoup.parser.Parser.parseBodyFragment(String,String)"
+    ]
+}

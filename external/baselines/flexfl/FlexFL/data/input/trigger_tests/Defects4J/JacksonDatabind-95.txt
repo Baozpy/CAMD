@@ -1,0 +1,41 @@
+public void testCanonicalNames()
+    {
+        TypeFactory tf = TypeFactory.defaultInstance();
+        JavaType t = tf.constructType(java.util.Calendar.class);
+        String can = t.toCanonical();
+        assertEquals("java.util.Calendar", can);
+        assertEquals(t, tf.constructFromCanonical(can));
+
+        // Generic maps and collections will default to Object.class if type-erased
+        t = tf.constructType(java.util.ArrayList.class);
+        can = t.toCanonical();
+        assertEquals("java.util.ArrayList<java.lang.Object>", can);
+        assertEquals(t, tf.constructFromCanonical(can));
+
+        t = tf.constructType(java.util.TreeMap.class);
+        can = t.toCanonical();
+        assertEquals("java.util.TreeMap<java.lang.Object,java.lang.Object>", can);
+        assertEquals(t, tf.constructFromCanonical(can));
+
+        // And then EnumMap (actual use case for us)
+        t = tf.constructMapType(EnumMap.class, EnumForCanonical.class, String.class);
+        can = t.toCanonical();
+        assertEquals("java.util.EnumMap<com.fasterxml.jackson.databind.type.TestTypeFactory$EnumForCanonical,java.lang.String>",
+                can);
+        assertEquals(t, tf.constructFromCanonical(can));
+
+        // [databind#1941]: allow "raw" types too
+
+        t = tf.constructFromCanonical("java.util.List");
+The last line shown above failed with the following stack trace.
+java.lang.NullPointerException
+	at com.fasterxml.jackson.databind.type.TypeFactory._fromVariable(TypeFactory.java:1413)
+	at com.fasterxml.jackson.databind.type.TypeFactory._fromAny(TypeFactory.java:1175)
+	at com.fasterxml.jackson.databind.type.TypeFactory._fromParamType(TypeFactory.java:1396)
+	at com.fasterxml.jackson.databind.type.TypeFactory._fromAny(TypeFactory.java:1165)
+	at com.fasterxml.jackson.databind.type.TypeFactory._resolveSuperInterfaces(TypeFactory.java:1311)
+	at com.fasterxml.jackson.databind.type.TypeFactory._fromClass(TypeFactory.java:1254)
+	at com.fasterxml.jackson.databind.type.TypeParser.parseType(TypeParser.java:59)
+	at com.fasterxml.jackson.databind.type.TypeParser.parse(TypeParser.java:32)
+	at com.fasterxml.jackson.databind.type.TypeFactory.constructFromCanonical(TypeFactory.java:536)
+	at com.fasterxml.jackson.databind.type.TestTypeFactory.testCanonicalNames(TestTypeFactory.java:237)

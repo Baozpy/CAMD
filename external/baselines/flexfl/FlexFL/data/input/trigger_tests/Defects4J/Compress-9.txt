@@ -1,0 +1,28 @@
+public void testCount() throws Exception {
+        File f = File.createTempFile("commons-compress-tarcount", ".tar");
+        f.deleteOnExit();
+        FileOutputStream fos = new FileOutputStream(f);
+
+        ArchiveOutputStream tarOut = new ArchiveStreamFactory()
+            .createArchiveOutputStream(ArchiveStreamFactory.TAR, fos);
+
+        File file1 = getFile("test1.xml");
+        TarArchiveEntry sEntry = new TarArchiveEntry(file1);
+        tarOut.putArchiveEntry(sEntry);
+
+        FileInputStream in = new FileInputStream(file1);
+        byte[] buf = new byte[8192];
+
+        int read = 0;
+        while ((read = in.read(buf)) > 0) {
+            tarOut.write(buf, 0, read);
+        }
+
+        in.close();
+        tarOut.closeArchiveEntry();
+        tarOut.close();
+
+        assertEquals(f.length(), tarOut.getBytesWritten());
+The last line shown above failed with the following stack trace.
+junit.framework.AssertionFailedError: expected:<10240> but was:<76>
+	at org.apache.commons.compress.archivers.tar.TarArchiveOutputStreamTest.testCount(TarArchiveOutputStreamTest.java:55)

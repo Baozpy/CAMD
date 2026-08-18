@@ -1,0 +1,22 @@
+public void shouldReadBigGid() throws Exception {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        TarArchiveOutputStream tos = new TarArchiveOutputStream(bos);
+        tos.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+        TarArchiveEntry t = new TarArchiveEntry("name");
+        t.setGroupId(4294967294l);
+        t.setSize(1);
+        tos.putArchiveEntry(t);
+        tos.write(30);
+        tos.closeArchiveEntry();
+        tos.close();
+        byte[] data = bos.toByteArray();
+        ByteArrayInputStream bis = new ByteArrayInputStream(data);
+        TarArchiveInputStream tis =
+            new TarArchiveInputStream(bis);
+        t = tis.getNextTarEntry();
+The last line shown above failed with the following stack trace.
+java.lang.NumberFormatException: For input string: "4294967294"
+	at org.apache.commons.compress.archivers.tar.TarArchiveInputStream.applyPaxHeadersToCurrentEntry(TarArchiveInputStream.java:501)
+	at org.apache.commons.compress.archivers.tar.TarArchiveInputStream.paxHeaders(TarArchiveInputStream.java:431)
+	at org.apache.commons.compress.archivers.tar.TarArchiveInputStream.getNextTarEntry(TarArchiveInputStream.java:311)
+	at org.apache.commons.compress.archivers.tar.TarArchiveInputStreamTest.shouldReadBigGid(TarArchiveInputStreamTest.java:254)

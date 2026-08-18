@@ -1,0 +1,31 @@
+public void testStringArray() throws Exception
+    {
+        final String[] STRS = new String[] {
+            "a", "b", "abcd", "", "???", "\"quoted\"", "lf: \n",
+        };
+        StringWriter sw = new StringWriter();
+        JsonGenerator jg = MAPPER.getFactory().createGenerator(sw);
+        jg.writeStartArray();
+        for (String str : STRS) {
+            jg.writeString(str);
+        }
+        jg.writeEndArray();
+        jg.close();
+
+        String[] result = MAPPER.readValue(sw.toString(), String[].class);
+        assertNotNull(result);
+
+        assertEquals(STRS.length, result.length);
+        for (int i = 0; i < STRS.length; ++i) {
+            assertEquals(STRS[i], result[i]);
+        }
+
+        // [#479]: null handling was busted in 2.4.0
+        result = MAPPER.readValue(" [ null ]", String[].class);
+The last line shown above failed with the following stack trace.
+java.lang.NullPointerException
+	at com.fasterxml.jackson.databind.deser.std.StringArrayDeserializer.deserialize(StringArrayDeserializer.java:66)
+	at com.fasterxml.jackson.databind.deser.std.StringArrayDeserializer.deserialize(StringArrayDeserializer.java:18)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3051)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2146)
+	at com.fasterxml.jackson.databind.deser.TestArrayDeserialization.testStringArray(TestArrayDeserialization.java:266)

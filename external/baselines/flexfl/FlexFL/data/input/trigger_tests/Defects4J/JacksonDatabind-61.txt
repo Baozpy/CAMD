@@ -1,0 +1,54 @@
+public void testDefaultTypingWithLong() throws Exception
+    {
+        Data data = new Data();
+        data.key = 1L;
+        Map<String, Object> mapData = new HashMap<String, Object>();
+        mapData.put("longInMap", 2L);
+        mapData.put("longAsField", data);
+
+        // Configure Jackson to preserve types
+        ObjectMapper mapper = new ObjectMapper();
+        StdTypeResolverBuilder resolver = new StdTypeResolverBuilder();
+        resolver.init(JsonTypeInfo.Id.CLASS, null);
+        resolver.inclusion(JsonTypeInfo.As.PROPERTY);
+        resolver.typeProperty("__t");
+        mapper.setDefaultTyping(resolver);
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+        // Serialize
+        String json = mapper.writeValueAsString(mapData);
+
+        // Deserialize
+        Map<?,?> result = mapper.readValue(json, Map.class);
+The last line shown above failed with the following stack trace.
+com.fasterxml.jackson.databind.JsonMappingException: Class java.lang.Long not subtype of [simple type, class long] (through reference chain: java.util.HashMap["longAsField"]->com.fasterxml.jackson.databind.jsontype.Data["key"])
+	at com.fasterxml.jackson.databind.JsonMappingException.wrapWithPath(JsonMappingException.java:379)
+	at com.fasterxml.jackson.databind.JsonMappingException.wrapWithPath(JsonMappingException.java:339)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.wrapAndThrow(BeanDeserializerBase.java:1591)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.vanillaDeserialize(BeanDeserializer.java:278)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeOther(BeanDeserializer.java:178)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:150)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer._deserializeTypedForId(AsPropertyTypeDeserializer.java:129)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer.deserializeTypedFromObject(AsPropertyTypeDeserializer.java:97)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer.deserializeTypedFromAny(AsPropertyTypeDeserializer.java:174)
+	at com.fasterxml.jackson.databind.deser.std.UntypedObjectDeserializer$Vanilla.deserializeWithType(UntypedObjectDeserializer.java:554)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer._readAndBindStringKeyMap(MapDeserializer.java:509)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer.deserialize(MapDeserializer.java:352)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer.deserialize(MapDeserializer.java:27)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer._deserializeTypedForId(AsPropertyTypeDeserializer.java:129)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer.deserializeTypedFromObject(AsPropertyTypeDeserializer.java:97)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer.deserializeWithType(MapDeserializer.java:387)
+	at com.fasterxml.jackson.databind.deser.impl.TypeWrappedDeserializer.deserialize(TypeWrappedDeserializer.java:63)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3795)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2839)
+	at com.fasterxml.jackson.databind.jsontype.DefaultTypingWithPrimitivesTest.testDefaultTypingWithLong(DefaultTypingWithPrimitivesTest.java:38)
+	at com.fasterxml.jackson.databind.type.TypeFactory.constructSpecializedType(TypeFactory.java:359)
+	at com.fasterxml.jackson.databind.jsontype.impl.ClassNameIdResolver._typeFromId(ClassNameIdResolver.java:72)
+	at com.fasterxml.jackson.databind.jsontype.impl.ClassNameIdResolver.typeFromId(ClassNameIdResolver.java:42)
+	at com.fasterxml.jackson.databind.jsontype.impl.TypeDeserializerBase._findDeserializer(TypeDeserializerBase.java:150)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsArrayTypeDeserializer._deserialize(AsArrayTypeDeserializer.java:97)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsArrayTypeDeserializer.deserializeTypedFromScalar(AsArrayTypeDeserializer.java:66)
+	at com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer.deserializeWithType(StdScalarDeserializer.java:26)
+	at com.fasterxml.jackson.databind.deser.SettableBeanProperty.deserialize(SettableBeanProperty.java:497)
+	at com.fasterxml.jackson.databind.deser.impl.FieldProperty.deserializeAndSet(FieldProperty.java:108)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.vanillaDeserialize(BeanDeserializer.java:276)

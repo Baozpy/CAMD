@@ -1,0 +1,151 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:Type checking error when replacing a function with a stub after calling.\nDescription:Given the following Javascript:\r\n\r\n  /** @constructor */\r\n  var myclass = function() {\r\n  }\r\n  \r\n  /** @param {boolean} success */\r\n  myclass.prototype.fn = function(success) { }\r\n  \r\n  myclass.prototype.test = function() {\r\n    this.fn();\r\n    this.fn = function() { };\r\n  }\r\n\r\nI would expect an error at both lines of test(). Instead, the second line causes the error in the first not to be reported.\n```\nThe trigger test is as follows:\n```\npublic void testIssue586() throws Exception {\n    testTypes(\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError: expected a warning\n\tat com.google.javascript.jscomp.TypeCheckTest.testTypes(TypeCheckTest.java:9391)\n\tat com.google.javascript.jscomp.TypeCheckTest.testTypes(TypeCheckTest.java:9371)\n\tat com.google.javascript.jscomp.TypeCheckTest.testTypes(TypeCheckTest.java:9309)\n\tat com.google.javascript.jscomp.TypeCheckTest.testIssue586(TypeCheckTest.java:5443)\n```\nThe suggested methods are as follows:\n```\n1.com.google.javascript.rhino.jstype.JSTypeRegistry.createFromTypeNodesInternal(Node,String,StaticScope<JSType>)\n2.com.google.javascript.rhino.jstype.JSTypeRegistry.initializeBuiltInTypes()\n3.com.google.javascript.jscomp.NodeUtil.getRootOfQualifiedName(Node)\n4.com.google.javascript.rhino.jstype.ArrowType.isSubtype(JSType)\n5.com.google.javascript.rhino.jstype.FunctionType.isReturnTypeInferred()\n6.com.google.javascript.jscomp.NodeUtil.getRootOfQualifiedName(Node)\n7.com.google.javascript.jscomp.TypedScopeCreator.AbstractScopeBuilder.isQnameRootedInGlobalScope(Node)\n8.com.google.javascript.jscomp.TypedScopeCreator.AbstractScopeBuilder.getQnameRootScope(Node)\n9.com.google.javascript.rhino.jstype.FunctionType.isReturnTypeInferred()\n10.com.google.javascript.rhino.jstype.ArrowType.isSubtype(JSType)\n11.com.google.javascript.jscomp.CompilerOptions.CompilerOptions()\n12.com.google.javascript.jscomp.CrossModuleMethodMotion.moveMethods(Collection<NameInfo>)\n13.com.google.javascript.jscomp.TypedScopeCreator.AbstractScopeBuilder.defineSlot(Node,Node,String,JSType,boolean)\n14.com.google.javascript.rhino.jstype.JSTypeRegistry.initializeBuiltInTypes()\n15.com.google.javascript.jscomp.ReplaceCssNames.Traversal.visit(NodeTraversal,Node,Node)\n16.com.google.javascript.jscomp.Compiler.compile(JSSourceFile,JSSourceFile,CompilerOptions)\n17.com.google.javascript.jscomp.Compiler.check()\n18.com.google.javascript.jscomp.Compiler.parse()\n19.com.google.javascript.jscomp.Compiler.compile(JSSourceFile[],JSSourceFile[],CompilerOptions)\n20.com.google.javascript.jscomp.Compiler.compile(List<JSSourceFile>,List<JSSourceFile>,CompilerOptions)\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can infer that the issue is related to type checking and the replacement of a function with a stub after calling. The bug report mentions that the second line of the `test()` method causes an error, but the first line does not report an error.\n\nGiven the suggested methods, I plan to focus on methods related to type checking, function types, and scope management. I will also consider methods that deal with function replacement and stubbing.\n\nHere's my plan:\n\n1. I will start by calling `get_code_snippet_of_method(1)` to get the code snippet of the `JSTypeRegistry.createFromTypeNodesInternal` method. This method seems to be related to type checking and might be relevant to the issue.\n2. If the code snippet does not reveal any obvious issues, I will call `get_code_snippet_of_method(9)` to get the code snippet of the `FunctionType.isReturnTypeInferred` method. This method is related to function types and might be relevant to the issue.\n3. If the issue is not related to type checking or function types, I will call `get_code_snippet_of_method(13)` to get the code snippet of the `AbstractScopeBuilder.defineSlot` method. This method is related to scope management and might be relevant to the issue.\n4. If the issue is still not clear, I will call `get_code_snippet_of_method(14)` to get the code snippet of the `JSTypeRegistry.initializeBuiltInTypes` method. This method is related to type checking and might be relevant to the issue.\n5. If the issue is still not clear, I will call `get_code_snippet_of_method(16)` to get the code snippet of the `Compiler.compile` method. This method is the entry point for the compiler and might be relevant to the issue.\n\nI will continue to call `get_code_snippet_of_method` for the next 5 methods that seem most relevant to the issue. If I still cannot identify the faulty method, I will exit and provide my final answer."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.rhino.jstype.JSTypeRegistry.createFromTypeNodesInternal(Node,String,StaticScope<JSType>) is as follows.\n/** @see #createFromTypeNodes(Node, String, StaticScope) */\t  private JSType createFromTypeNodesInternal(Node n, String sourceName,\t      StaticScope<JSType> scope) {\t    switch (n.getType()) {\t      case Token.LC: // Record type.\t        return createRecordTypeFromNodes(\t            n.getFirstChild(), sourceName, scope);\t\t      case Token.BANG: // Not nullable\t        return createFromTypeNodesInternal(\t            n.getFirstChild(), sourceName, scope)\t            .restrictByNotNullOrUndefined();\t\t      case Token.QMARK: // Nullable or unknown\t        Node firstChild = n.getFirstChild();\t        if (firstChild == null) {\t          return getNativeType(UNKNOWN_TYPE);\t        }\t        return createDefaultObjectUnion(\t            createFromTypeNodesInternal(\t                firstChild, sourceName, scope));\t\t      case Token.EQUALS: // Optional\t        return createOptionalType(\t            createFromTypeNodesInternal(\t                n.getFirstChild(), sourceName, scope));\t\t      case Token.ELLIPSIS: // Var args\t        return createOptionalType(\t            createFromTypeNodesInternal(\t                n.getFirstChild(), sourceName, scope));\t\t      case Token.STAR: // The AllType\t        return getNativeType(ALL_TYPE);\t\t      case Token.LB: // Array type\t        // TODO(nicksantos): Enforce membership restrictions on the Array.\t        return getNativeType(ARRAY_TYPE);\t\t      case Token.PIPE: // Union type\t        UnionTypeBuilder builder = new UnionTypeBuilder(this);\t        for (Node child = n.getFirstChild(); child != null;\t             child = child.getNext()) {\t          builder.addAlternate(\t              createFromTypeNodesInternal(child, sourceName, scope));\t        }\t        return builder.build();\t\t      case Token.EMPTY: // When the return value of a function is not specified\t        return getNativeType(UNKNOWN_TYPE);\t\t      case Token.VOID: // Only allowed in the return value of a function.\t        return getNativeType(VOID_TYPE);\t\t      case Token.STRING:\t        JSType namedType = getType(scope, n.getString(), sourceName,\t            n.getLineno(), n.getCharno());\t        if (resolveMode != ResolveMode.LAZY_NAMES) {\t          namedType = namedType.resolveInternal(reporter, scope);\t        }\t        if ((namedType instanceof ObjectType) &&\t            !(nonNullableTypeNames.contains(n.getString()))) {\t          Node typeList = n.getFirstChild();\t          if (typeList != null &&\t              (\"Array\".equals(n.getString()) ||\t               \"Object\".equals(n.getString()))) {\t            JSType parameterType =\t                createFromTypeNodesInternal(\t                    typeList.getLastChild(), sourceName, scope);\t            namedType = new ParameterizedType(\t                this, (ObjectType) namedType, parameterType);\t            if (typeList.hasMoreThanOneChild()) {\t              JSType indexType =\t                  createFromTypeNodesInternal(\t                      typeList.getFirstChild(), sourceName, scope);\t              namedType = new IndexedType(\t                  this, (ObjectType) namedType, indexType);\t            }\t          }\t          return createDefaultObjectUnion(namedType);\t        } else {\t          return namedType;\t        }\t\t      case Token.FUNCTION:\t        ObjectType thisType = null;\t        boolean isConstructor = false;\t        Node current = n.getFirstChild();\t        if (current.getType() == Token.THIS ||\t            current.getType() == Token.NEW) {\t          Node contextNode = current.getFirstChild();\t          thisType =\t              ObjectType.cast(\t                  createFromTypeNodesInternal(\t                      contextNode, sourceName, scope)\t                  .restrictByNotNullOrUndefined());\t          if (thisType == null) {\t            reporter.warning(\t                ScriptRuntime.getMessage0(\t                    current.getType() == Token.THIS ?\t                    \"msg.jsdoc.function.thisnotobject\" :\t                    \"msg.jsdoc.function.newnotobject\"),\t                sourceName,\t                contextNode.getLineno(), contextNode.getCharno());\t          }\t\t          isConstructor = current.getType() == Token.NEW;\t          current = current.getNext();\t        }\t\t        FunctionParamBuilder paramBuilder = new FunctionParamBuilder(this);\t\t        if (current.getType() == Token.PARAM_LIST) {\t          Node args = current.getFirstChild();\t          for (Node arg = current.getFirstChild(); arg != null;\t               arg = arg.getNext()) {\t            if (arg.getType() == Token.ELLIPSIS) {\t              if (arg.getChildCount() == 0) {\t                paramBuilder.addVarArgs(getNativeType(UNKNOWN_TYPE));\t              } else {\t                paramBuilder.addVarArgs(\t                    createFromTypeNodesInternal(\t                        arg.getFirstChild(), sourceName, scope));\t              }\t            } else {\t              JSType type = createFromTypeNodesInternal(\t                  arg, sourceName, scope);\t              if (arg.getType() == Token.EQUALS) {\t                boolean addSuccess = paramBuilder.addOptionalParams(type);\t                if (!addSuccess) {\t                  reporter.warning(\t                      ScriptRuntime.getMessage0(\"msg.jsdoc.function.varargs\"),\t                      sourceName, arg.getLineno(), arg.getCharno());\t                }\t              } else {\t                paramBuilder.addRequiredParams(type);\t              }\t            }\t          }\t          current = current.getNext();\t        }\t\t        JSType returnType =\t            createFromTypeNodesInternal(current, sourceName, scope);\t\t        return new FunctionBuilder(this)\t            .withParams(paramBuilder)\t            .withReturnType(returnType)\t            .withTypeOfThis(thisType)\t            .setIsConstructor(isConstructor)\t            .build();\t    }\t\t    throw new IllegalStateException(\t        \"Unexpected node in type expression: \" + n.toString());\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(9)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.rhino.jstype.FunctionType.isReturnTypeInferred() is as follows.\npublic boolean isReturnTypeInferred() {\t    return call.returnTypeInferred;\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(13)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.TypedScopeCreator.AbstractScopeBuilder.defineSlot(Node,Node,String,JSType,boolean) is as follows.\n/**\t     * Defines a symbol in the current scope.\t     *\t     * @param n the defining NAME or GETPROP or object literal key node.\t     * @param parent the {@code n}'s parent.\t     * @param variableName The name that this should be known by.\t     * @param type the variable's type. It may be {@code null} if\t     *     {@code inferred} is {@code true}.\t     * @param inferred Whether the type is inferred or declared.\t     */\t    void defineSlot(Node n, Node parent, String variableName,\t        JSType type, boolean inferred) {\t      Preconditions.checkArgument(!variableName.isEmpty());\t\t      boolean isGlobalVar = n.isName() && scope.isGlobal();\t      boolean shouldDeclareOnGlobalThis =\t          isGlobalVar &&\t          (parent.isVar() ||\t           parent.isFunction());\t\t      // If n is a property, then we should really declare it in the\t      // scope where the root object appears. This helps out people\t      // who declare \"global\" names in an anonymous namespace.\t      Scope scopeToDeclareIn = scope;\t      if (n.isGetProp() && !scope.isGlobal() &&\t          isQnameRootedInGlobalScope(n)) {\t        Scope globalScope = scope.getGlobalScope();\t\t        // don't try to declare in the global scope if there's\t        // already a symbol there with this name.\t        if (!globalScope.isDeclared(variableName, false)) {\t          scopeToDeclareIn = scope.getGlobalScope();\t        }\t      }\t\t      // declared in closest scope?\t      CompilerInput input = compiler.getInput(inputId);\t      if (scopeToDeclareIn.isDeclared(variableName, false)) {\t        Var oldVar = scopeToDeclareIn.getVar(variableName);\t        validator.expectUndeclaredVariable(\t            sourceName, input, n, parent, oldVar, variableName, type);\t      } else {\t        if (!inferred) {\t          setDeferredType(n, type);\t        }\t\t        // The input may be null if we are working with a AST snippet.\t        boolean isExtern = n.isFromExterns();\t        Var newVar =\t            scopeToDeclareIn.declare(variableName, n, type, input, inferred);\t\t        if (type instanceof EnumType) {\t          Node initialValue = newVar.getInitialValue();\t          boolean isValidValue = initialValue != null &&\t              (initialValue.isObjectLit() ||\t               initialValue.isQualifiedName());\t          if (!isValidValue) {\t            compiler.report(JSError.make(sourceName, n, ENUM_INITIALIZER));\t          }\t        }\t\t        // We need to do some additional work for constructors and interfaces.\t        FunctionType fnType = JSType.toMaybeFunctionType(type);\t        if (fnType != null &&\t            // We don't want to look at empty function types.\t            !type.isEmptyType()) {\t          if ((fnType.isConstructor() || fnType.isInterface()) &&\t              !fnType.equals(getNativeType(U2U_CONSTRUCTOR_TYPE))) {\t            // Declare var.prototype in the scope chain.\t            FunctionType superClassCtor = fnType.getSuperClassConstructor();\t            ObjectType.Property prototypeSlot = fnType.getSlot(\"prototype\");\t\t            String prototypeName = variableName + \".prototype\";\t\t            // There are some rare cases where the prototype will already\t            // be declared. See TypedScopeCreatorTest#testBogusPrototypeInit.\t            // Fortunately, other warnings will complain if this happens.\t            if (scopeToDeclareIn.getOwnSlot(prototypeName) == null) {\t              // When we declare the function prototype implicitly, we\t              // want to make sure that the function and its prototype\t              // are declared at the same node. We also want to make sure\t              // that the if a symbol has both a Var and a JSType, they have\t              // the same node.\t              //\t              // This consistency is helpful to users of SymbolTable,\t              // because everything gets declared at the same place.\t              prototypeSlot.setNode(n);\t\t              scopeToDeclareIn.declare(prototypeName,\t                  n, prototypeSlot.getType(), input,\t                  /* declared iff there's an explicit supertype */\t                  superClassCtor == null ||\t                  superClassCtor.getInstanceType().equals(\t                      getNativeType(OBJECT_TYPE)));\t            }\t\t            // Make sure the variable is initialized to something if\t            // it constructs itself.\t            if (newVar.getInitialValue() == null &&\t                !isExtern &&\t                // We want to make sure that when we declare a new instance\t                // type (with @constructor) that there's actually a ctor for it.\t                // This doesn't apply to structural constructors\t                // (like function(new:Array). Checking the constructed\t                // type against the variable name is a sufficient check for\t                // this.\t                variableName.equals(\t                    fnType.getInstanceType().getReferenceName())) {\t              compiler.report(\t                  JSError.make(sourceName, n,\t                      fnType.isConstructor() ?\t                          CTOR_INITIALIZER : IFACE_INITIALIZER,\t                      variableName));\t            }\t          }\t        }\t      }\t\t      if (shouldDeclareOnGlobalThis) {\t        ObjectType globalThis =\t            typeRegistry.getNativeObjectType(GLOBAL_THIS);\t        if (inferred) {\t          globalThis.defineInferredProperty(variableName,\t              type == null ?\t              getNativeType(JSTypeNative.NO_TYPE) :\t              type,\t              n);\t        } else {\t          globalThis.defineDeclaredProperty(variableName, type, n);\t        }\t      }\t\t      if (isGlobalVar && \"Window\".equals(variableName)\t          && type != null\t          && type.isFunctionType()\t          && type.isConstructor()) {\t        FunctionType globalThisCtor =\t            typeRegistry.getNativeObjectType(GLOBAL_THIS).getConstructor();\t        globalThisCtor.getInstanceType().clearCachedValues();\t        globalThisCtor.getPrototype().clearCachedValues();\t        globalThisCtor\t            .setPrototypeBasedOn((type.toMaybeFunctionType()).getInstanceType());\t      }\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.Compiler.compile(JSSourceFile,JSSourceFile,CompilerOptions) is as follows.\npublic Result compile(\t      JSSourceFile extern, JSSourceFile input, CompilerOptions options) {\t     return compile(extern, new JSSourceFile[] { input }, options);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit"
+        },
+        {
+            "role": "user",
+            "content": "Please call functions in the right format `FunctionName(Argument)`.\nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\n"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(17)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.Compiler.check() is as follows.\npublic void check() {\t    runCustomPasses(CustomPassExecutionTime.BEFORE_CHECKS);\t\t    PhaseOptimizer phaseOptimizer = new PhaseOptimizer(this, tracker);\t    if (options.devMode == DevMode.EVERY_PASS) {\t      phaseOptimizer.setSanityCheck(sanityCheck);\t    }\t    phaseOptimizer.consume(getPassConfig().getChecks());\t    phaseOptimizer.process(externsRoot, jsRoot);\t    if (hasErrors()) {\t      return;\t    }\t\t    // TODO(nicksantos): clean this up. The flow here is too hard to follow.\t    if (options.nameAnonymousFunctionsOnly) {\t      return;\t    }\t\t    if (options.removeTryCatchFinally) {\t      removeTryCatchFinally();\t    }\t\t    if (options.getTweakProcessing().shouldStrip() ||\t        !options.stripTypes.isEmpty() ||\t        !options.stripNameSuffixes.isEmpty() ||\t        !options.stripTypePrefixes.isEmpty() ||\t        !options.stripNamePrefixes.isEmpty()) {\t      stripCode(options.stripTypes, options.stripNameSuffixes,\t          options.stripTypePrefixes, options.stripNamePrefixes);\t    }\t\t    runCustomPasses(CustomPassExecutionTime.BEFORE_OPTIMIZATIONS);\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(20)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of com.google.javascript.jscomp.Compiler.compile(List<JSSourceFile>,List<JSSourceFile>,CompilerOptions) is as follows.\n/**\t   * Compiles a list of inputs.\t   */\t  public Result compile(List<JSSourceFile> externs,\t      List<JSSourceFile> inputs, CompilerOptions options) {\t    // The compile method should only be called once.\t    Preconditions.checkState(jsRoot == null);\t\t    try {\t      init(externs, inputs, options);\t      if (hasErrors()) {\t        return getResult();\t      }\t      return compile();\t    } finally {\t      Tracer t = newTracer(\"generateReport\");\t      errorManager.generateReport();\t      stopTracer(t, \"generateReport\");\t    }\t  }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit"
+        },
+        {
+            "role": "user",
+            "content": "Please call functions in the right format `FunctionName(Argument)`.\nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\n"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit"
+        },
+        {
+            "role": "user",
+            "content": "Please call functions in the right format `FunctionName(Argument)`.\nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\n"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit"
+        },
+        {
+            "role": "user",
+            "content": "Please call functions in the right format `FunctionName(Argument)`.\nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\n"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the available information, here are the top-5 most likely culprit methods for the bug:\n\nTop_1 : com.google.javascript.rhino.jstype.JSTypeRegistry.createFromTypeNodesInternal(Node, String, StaticScope<JSType>)\nTop_2 : com.google.javascript.rhino.jstype.FunctionType.isReturnTypeInferred()\nTop_3 : com.google.javascript.jscomp.TypedScopeCreator.AbstractScopeBuilder.defineSlot(Node, Node, String, JSType, boolean)\nTop_4 : com.google.javascript.jscomp.Compiler.compile(JSSourceFile, JSSourceFile, CompilerOptions)\nTop_5 : com.google.javascript.jscomp.Compiler.compile(List<JSSourceFile>, List<JSSourceFile>, CompilerOptions)"
+        }
+    ],
+    "fl_results": [
+        "com.google.javascript.rhino.jstype.JSTypeRegistry.createFromTypeNodesInternal(Node,String,StaticScope<JSType>)",
+        "com.google.javascript.rhino.jstype.FunctionType.isReturnTypeInferred()",
+        "com.google.javascript.jscomp.TypedScopeCreator.AbstractScopeBuilder.defineSlot(Node,Node,String,JSType,boolean)",
+        "com.google.javascript.jscomp.Compiler.compile(JSSourceFile,JSSourceFile,CompilerOptions)",
+        "com.google.javascript.jscomp.Compiler.compile(List<JSSourceFile>,List<JSSourceFile>,CompilerOptions)"
+    ]
+}

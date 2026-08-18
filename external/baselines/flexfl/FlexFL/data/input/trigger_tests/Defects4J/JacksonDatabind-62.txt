@@ -1,0 +1,22 @@
+public void testUnmodifiable() throws Exception
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        Class<?> unmodSetType = Collections.unmodifiableSet(Collections.<String>emptySet()).getClass();
+        mapper.addMixIn(unmodSetType, UnmodifiableSetMixin.class);
+        mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+
+        final String EXPECTED_JSON = "[\""+unmodSetType.getName()+"\",[]]";
+
+        Set<?> foo = mapper.readValue(EXPECTED_JSON, Set.class);
+The last line shown above failed with the following stack trace.
+java.lang.IllegalStateException: No default constructor for [collection type; class java.util.Collections$UnmodifiableSet, contains [simple type, class java.lang.Object]]
+	at com.fasterxml.jackson.databind.deser.std.StdValueInstantiator.createUsingDefault(StdValueInstantiator.java:240)
+	at com.fasterxml.jackson.databind.deser.std.CollectionDeserializer.deserialize(CollectionDeserializer.java:251)
+	at com.fasterxml.jackson.databind.deser.std.CollectionDeserializer.deserialize(CollectionDeserializer.java:26)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsArrayTypeDeserializer._deserialize(AsArrayTypeDeserializer.java:110)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsArrayTypeDeserializer.deserializeTypedFromArray(AsArrayTypeDeserializer.java:50)
+	at com.fasterxml.jackson.databind.deser.std.CollectionDeserializer.deserializeWithType(CollectionDeserializer.java:312)
+	at com.fasterxml.jackson.databind.deser.impl.TypeWrappedDeserializer.deserialize(TypeWrappedDeserializer.java:63)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3807)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2797)
+	at com.fasterxml.jackson.databind.creators.ArrayDelegatorCreatorForCollectionTest.testUnmodifiable(ArrayDelegatorCreatorForCollectionTest.java:28)

@@ -1,0 +1,21 @@
+public void testDisappearingMixins515() throws Exception
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.disable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)
+            .disable(MapperFeature.AUTO_DETECT_FIELDS)
+            .disable(MapperFeature.AUTO_DETECT_GETTERS)
+            .disable(MapperFeature.AUTO_DETECT_IS_GETTERS)
+            .disable(MapperFeature.INFER_PROPERTY_MUTATORS);
+        SimpleModule module = new SimpleModule("Test");
+        module.setMixInAnnotation(Person.class, PersonMixin.class);        
+        mapper.registerModule(module);
+
+        assertEquals("{\"city\":\"Seattle\"}", mapper.writeValueAsString(new PersonImpl()));
+The last line shown above failed with the following stack trace.
+com.fasterxml.jackson.databind.JsonMappingException: No serializer found for class com.fasterxml.jackson.databind.introspect.TestMixinMerging$PersonImpl and no properties discovered to create BeanSerializer (to avoid exception, disable SerializationFeature.FAIL_ON_EMPTY_BEANS) )
+	at com.fasterxml.jackson.databind.ser.impl.UnknownSerializer.failForEmpty(UnknownSerializer.java:59)
+	at com.fasterxml.jackson.databind.ser.impl.UnknownSerializer.serialize(UnknownSerializer.java:26)
+	at com.fasterxml.jackson.databind.ser.DefaultSerializerProvider.serializeValue(DefaultSerializerProvider.java:114)
+	at com.fasterxml.jackson.databind.ObjectMapper._configAndWriteValue(ObjectMapper.java:2866)
+	at com.fasterxml.jackson.databind.ObjectMapper.writeValueAsString(ObjectMapper.java:2323)
+	at com.fasterxml.jackson.databind.introspect.TestMixinMerging.testDisappearingMixins515(TestMixinMerging.java:48)

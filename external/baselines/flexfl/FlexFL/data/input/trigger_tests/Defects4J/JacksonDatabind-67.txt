@@ -1,0 +1,59 @@
+public void testCustomEnumValueAndKeyViaModifier() throws IOException
+    {
+        SimpleModule module = new SimpleModule();
+        module.setDeserializerModifier(new BeanDeserializerModifier() {        
+            @Override
+            public JsonDeserializer<Enum> modifyEnumDeserializer(DeserializationConfig config,
+                    final JavaType type, BeanDescription beanDesc,
+                    final JsonDeserializer<?> deserializer) {
+                return new JsonDeserializer<Enum>() {
+                    @Override
+                    public Enum deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                        Class<? extends Enum> rawClass = (Class<Enum<?>>) type.getRawClass();
+                        final String str = p.getValueAsString().toLowerCase();
+                        return KeyEnum.valueOf(rawClass, str);
+                    }
+                };
+            }
+
+            @Override
+            public KeyDeserializer modifyKeyDeserializer(DeserializationConfig config,
+                    final JavaType type, KeyDeserializer deserializer)
+            {
+                if (!type.isEnumType()) {
+                    return deserializer;
+                }
+                return new KeyDeserializer() {
+                    @Override
+                    public Object deserializeKey(String key, DeserializationContext ctxt)
+                            throws IOException
+                    {
+                        Class<? extends Enum> rawClass = (Class<Enum<?>>) type.getRawClass();
+                        return Enum.valueOf(rawClass, key.toLowerCase());
+                    }
+                };
+            }
+        });
+        ObjectMapper mapper = new ObjectMapper()
+                .registerModule(module);
+
+        // First, enum value as is
+        KeyEnum key = mapper.readValue(quote(KeyEnum.replacements.name().toUpperCase()),
+                KeyEnum.class);
+        assertSame(KeyEnum.replacements, key);
+
+        // and then as key
+        EnumMap<KeyEnum,String> map = mapper.readValue(
+The last line shown above failed with the following stack trace.
+com.fasterxml.jackson.databind.exc.InvalidFormatException: Can not deserialize Map key of type com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer$KeyEnum from String "REPlaceMENTS": not a valid representation, problem: (com.fasterxml.jackson.databind.exc.InvalidFormatException) Can not deserialize Map key of type com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer$KeyEnum from String "REPlaceMENTS": not one of values excepted for Enum class: [rootDirectory, replacements, licenseString]
+ at [Source: {"REPlaceMENTS":"foobar"}; line: 1, column: 2]
+ at [Source: {"REPlaceMENTS":"foobar"}; line: 1, column: 2]
+	at com.fasterxml.jackson.databind.exc.InvalidFormatException.from(InvalidFormatException.java:74)
+	at com.fasterxml.jackson.databind.DeserializationContext.weirdKeyException(DeserializationContext.java:1389)
+	at com.fasterxml.jackson.databind.DeserializationContext.handleWeirdKey(DeserializationContext.java:880)
+	at com.fasterxml.jackson.databind.deser.std.StdKeyDeserializer.deserializeKey(StdKeyDeserializer.java:130)
+	at com.fasterxml.jackson.databind.deser.std.EnumMapDeserializer.deserialize(EnumMapDeserializer.java:139)
+	at com.fasterxml.jackson.databind.deser.std.EnumMapDeserializer.deserialize(EnumMapDeserializer.java:17)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3798)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2861)
+	at com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer.testCustomEnumValueAndKeyViaModifier(TestCustomEnumKeyDeserializer.java:275)

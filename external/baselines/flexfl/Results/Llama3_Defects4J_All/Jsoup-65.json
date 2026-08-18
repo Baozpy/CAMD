@@ -1,0 +1,99 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:Parser error on &lt;template&gt; inside &lt;tr&gt;\nDescription:\nI've been experimenting with jsoup as a validator for TensorBoard code and I encountered a bug.\nIf I have code like this:\n          <tr>\n            <th></th>\n            <th>Name</th>\n            <template is=\"dom-if\" if=\"{{smoothingEnabled}}\">\n              <th>Smoothed</th>\n            </template>   \n            <th>Value</th>\n            <th>Step</th>\n            <th>Time</th>\n            <th>Relative</th>\n          </tr>\nI get errors like this:\nERROR: tensorflow/tensorboard/components/vz_line_chart/vz-line-chart.html (offset 1282): Unexpected token [StartTag] when in state [InTable]\nERROR: tensorflow/tensorboard/components/vz_line_chart/vz-line-chart.html (offset 1338): Unexpected token [EndTag] when in state [InTable]\nERROR: tensorflow/tensorboard/components/vz_line_chart/vz-line-chart.html (offset 1338): Unexpected token [EndTag] when in state [InBody]\nPlease note that those offset numbers point to the <template> tags.\nTemplate tag is legal here because https://www.w3.org/TR/html5/tabular-data.html#the-tr-element says content model for tr is \"Zero or more td, th, and script-supporting elements\" and template is a script supporting element.\n\n```\nThe trigger test is as follows:\n```\npublic void testTemplateInsideTable() throws IOException {\n        File in = ParseTest.getFile(\"/htmltests/table-polymer-template.html\");\n        Document doc = Jsoup.parse(in, \"UTF-8\");\n        doc.outputSettings().prettyPrint(true);\n\n        Elements templates = doc.body().getElementsByTag(\"template\");\n        for (Element template : templates) {\n            assertTrue(template.childNodes().size() > 1);\nThe last line shown above failed with the following stack trace.\njunit.framework.AssertionFailedError\n\tat org.jsoup.parser.HtmlParserTest.testTemplateInsideTable(HtmlParserTest.java:1045)\n```\nThe suggested methods are as follows:\n```\n1.org.jsoup.parser.HtmlTreeBuilder.insert(Token.Comment)\n2.org.jsoup.nodes.Entities.getByName(String)\n3.org.jsoup.parser.HtmlTreeBuilder.error(HtmlTreeBuilderState)\n4.org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList,ParseSettings)\n5.org.jsoup.parser.HtmlTreeBuilder.resetInsertionMode()\n6.org.jsoup.nodes.Entities.getByName(String)\n7.org.jsoup.parser.HtmlTreeBuilder.insertInFosterParent(Node)\n8.org.jsoup.parser.HtmlTreeBuilder.setFosterInserts(boolean)\n9.org.jsoup.nodes.Node.before(Node)\n10.org.jsoup.nodes.Element.before(Node)\n11.org.jsoup.safety.Whitelist.relaxed()\n12.org.jsoup.parser.HtmlTreeBuilder.initialiseParse(Reader,String,ParseErrorList,ParseSettings)\n13.org.jsoup.parser.HtmlTreeBuilder.resetInsertionMode()\n14.org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList,ParseSettings)\n15.org.jsoup.helper.HttpConnection.Response.processResponseHeaders(Map<String,List<String>>)\n16.org.jsoup.Jsoup.parse(String,String)\n17.org.jsoup.parser.Parser.parse(String,String)\n18.org.jsoup.nodes.Element.attr(String,String)\n19.org.jsoup.parser.XmlTreeBuilder.parse(Reader,String)\n20.org.jsoup.parser.TreeBuilder.parse(Reader,String,ParseErrorList,ParseSettings)\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, it seems that the issue is related to parsing HTML code with a `<template>` tag inside a `<tr>` tag. The error message suggests that the parser is expecting a different token when it encounters the `<template>` tag.\n\nGiven the methods suggested, I plan to start by looking at the methods related to HTML parsing and tokenization. Specifically, I will focus on methods that handle the parsing of HTML elements and tokens.\n\nHere's my plan:\n\n1. Call `get_code_snippet_of_method(1)` to get the code snippet of `org.jsoup.parser.HtmlTreeBuilder.insert(Token.Comment)`. This method seems to be related to inserting tokens into the HTML tree, which might be relevant to the bug.\n2. If the code snippet doesn't reveal any obvious issues, I will call `get_code_snippet_of_method(4)` to get the code snippet of `org.jsoup.parser.HtmlTreeBuilder.parseFragment(String, Element, String, ParseErrorList, ParseSettings)`. This method seems to be responsible for parsing HTML fragments, which might be where the bug is occurring.\n3. If the bug is not immediately apparent from the code snippets, I will call `get_code_snippet_of_method(13)` to get the code snippet of `org.jsoup.parser.HtmlTreeBuilder.resetInsertionMode()`. This method seems to be related to resetting the insertion mode of the HTML parser, which might be relevant to the bug.\n4. If the bug is still not apparent, I will call `get_code_snippet_of_method(14)` to get the code snippet of `org.jsoup.parser.HtmlTreeBuilder.parseFragment(String, Element, String, ParseErrorList, ParseSettings)`. This method seems to be similar to the previous one, and might be where the bug is occurring.\n5. If the bug is still not apparent, I will call `get_code_snippet_of_method(16)` to get the code snippet of `org.jsoup.Jsoup.parse(String, String)`. This method seems to be the entry point for parsing HTML code, and might be where the bug is occurring.\n\nI will continue to call these methods and analyze the code snippets until I have a good understanding of where the bug is occurring."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(1)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.HtmlTreeBuilder.insert(Token.Comment) is as follows.\nvoid insert(Token.Comment commentToken) {\t        Comment comment = new Comment(commentToken.getData());\t        insertNode(comment);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(4)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList,ParseSettings) is as follows.\nList<Node> parseFragment(String inputFragment, Element context, String baseUri, ParseErrorList errors, ParseSettings settings) {\t        // context may be null\t        state = HtmlTreeBuilderState.Initial;\t        initialiseParse(new StringReader(inputFragment), baseUri, errors, settings);\t        contextElement = context;\t        fragmentParsing = true;\t        Element root = null;\t\t        if (context != null) {\t            if (context.ownerDocument() != null) // quirks setup:\t                doc.quirksMode(context.ownerDocument().quirksMode());\t\t            // initialise the tokeniser state:\t            String contextTag = context.tagName();\t            if (StringUtil.in(contextTag, \"title\", \"textarea\"))\t                tokeniser.transition(TokeniserState.Rcdata);\t            else if (StringUtil.in(contextTag, \"iframe\", \"noembed\", \"noframes\", \"style\", \"xmp\"))\t                tokeniser.transition(TokeniserState.Rawtext);\t            else if (contextTag.equals(\"script\"))\t                tokeniser.transition(TokeniserState.ScriptData);\t            else if (contextTag.equals((\"noscript\")))\t                tokeniser.transition(TokeniserState.Data); // if scripting enabled, rawtext\t            else if (contextTag.equals(\"plaintext\"))\t                tokeniser.transition(TokeniserState.Data);\t            else\t                tokeniser.transition(TokeniserState.Data); // default\t\t            root = new Element(Tag.valueOf(\"html\", settings), baseUri);\t            doc.appendChild(root);\t            stack.add(root);\t            resetInsertionMode();\t\t            // setup form element to nearest form on context (up ancestor chain). ensures form controls are associated\t            // with form correctly\t            Elements contextChain = context.parents();\t            contextChain.add(0, context);\t            for (Element parent: contextChain) {\t                if (parent instanceof FormElement) {\t                    formElement = (FormElement) parent;\t                    break;\t                }\t            }\t        }\t\t        runParser();\t        if (context != null)\t            return root.childNodes();\t        else\t            return doc.childNodes();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(13)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.HtmlTreeBuilder.resetInsertionMode() is as follows.\nvoid resetInsertionMode() {\t        boolean last = false;\t        for (int pos = stack.size() -1; pos >= 0; pos--) {\t            Element node = stack.get(pos);\t            if (pos == 0) {\t                last = true;\t                node = contextElement;\t            }\t            String name = node.nodeName();\t            if (\"select\".equals(name)) {\t                transition(HtmlTreeBuilderState.InSelect);\t                break; // frag\t            } else if ((\"td\".equals(name) || \"th\".equals(name) && !last)) {\t                transition(HtmlTreeBuilderState.InCell);\t                break;\t            } else if (\"tr\".equals(name)) {\t                transition(HtmlTreeBuilderState.InRow);\t                break;\t            } else if (\"tbody\".equals(name) || \"thead\".equals(name) || \"tfoot\".equals(name)) {\t                transition(HtmlTreeBuilderState.InTableBody);\t                break;\t            } else if (\"caption\".equals(name)) {\t                transition(HtmlTreeBuilderState.InCaption);\t                break;\t            } else if (\"colgroup\".equals(name)) {\t                transition(HtmlTreeBuilderState.InColumnGroup);\t                break; // frag\t            } else if (\"table\".equals(name)) {\t                transition(HtmlTreeBuilderState.InTable);\t                break;\t            } else if (\"head\".equals(name)) {\t                transition(HtmlTreeBuilderState.InBody);\t                break; // frag\t            } else if (\"body\".equals(name)) {\t                transition(HtmlTreeBuilderState.InBody);\t                break;\t            } else if (\"frameset\".equals(name)) {\t                transition(HtmlTreeBuilderState.InFrameset);\t                break; // frag\t            } else if (\"html\".equals(name)) {\t                transition(HtmlTreeBuilderState.BeforeHead);\t                break; // frag\t            } else if (last) {\t                transition(HtmlTreeBuilderState.InBody);\t                break; // frag\t            }\t        }\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(14)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList,ParseSettings) is as follows.\nList<Node> parseFragment(String inputFragment, Element context, String baseUri, ParseErrorList errors, ParseSettings settings) {\t        // context may be null\t        state = HtmlTreeBuilderState.Initial;\t        initialiseParse(new StringReader(inputFragment), baseUri, errors, settings);\t        contextElement = context;\t        fragmentParsing = true;\t        Element root = null;\t\t        if (context != null) {\t            if (context.ownerDocument() != null) // quirks setup:\t                doc.quirksMode(context.ownerDocument().quirksMode());\t\t            // initialise the tokeniser state:\t            String contextTag = context.tagName();\t            if (StringUtil.in(contextTag, \"title\", \"textarea\"))\t                tokeniser.transition(TokeniserState.Rcdata);\t            else if (StringUtil.in(contextTag, \"iframe\", \"noembed\", \"noframes\", \"style\", \"xmp\"))\t                tokeniser.transition(TokeniserState.Rawtext);\t            else if (contextTag.equals(\"script\"))\t                tokeniser.transition(TokeniserState.ScriptData);\t            else if (contextTag.equals((\"noscript\")))\t                tokeniser.transition(TokeniserState.Data); // if scripting enabled, rawtext\t            else if (contextTag.equals(\"plaintext\"))\t                tokeniser.transition(TokeniserState.Data);\t            else\t                tokeniser.transition(TokeniserState.Data); // default\t\t            root = new Element(Tag.valueOf(\"html\", settings), baseUri);\t            doc.appendChild(root);\t            stack.add(root);\t            resetInsertionMode();\t\t            // setup form element to nearest form on context (up ancestor chain). ensures form controls are associated\t            // with form correctly\t            Elements contextChain = context.parents();\t            contextChain.add(0, context);\t            for (Element parent: contextChain) {\t                if (parent instanceof FormElement) {\t                    formElement = (FormElement) parent;\t                    break;\t                }\t            }\t        }\t\t        runParser();\t        if (context != null)\t            return root.childNodes();\t        else\t            return doc.childNodes();\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(16)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.jsoup.Jsoup.parse(String,String) is as follows.\n/**\t     Parse HTML into a Document. The parser will make a sensible, balanced document tree out of any HTML.\t\t     @param html    HTML to parse\t     @param baseUri The URL where the HTML was retrieved from. Used to resolve relative URLs to absolute URLs, that occur\t     before the HTML declares a {@code <base href>} tag.\t     @return sane HTML\t     */\t    public static Document parse(String html, String baseUri) {\t        return Parser.parse(html, baseUri);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.jsoup.parser.HtmlTreeBuilder.parseFragment(String, Element, String, ParseErrorList, ParseSettings)\nTop_2 : org.jsoup.parser.HtmlTreeBuilder.resetInsertionMode()\nTop_3 : org.jsoup.parser.HtmlTreeBuilder.insert(Token.Comment)\nTop_4 : org.jsoup.parser.HtmlTreeBuilder.parseFragment(String, Element, String, ParseErrorList, ParseSettings)\nTop_5 : org.jsoup.Jsoup.parse(String, String)"
+        }
+    ],
+    "fl_results": [
+        "org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList,ParseSettings)",
+        "org.jsoup.parser.HtmlTreeBuilder.resetInsertionMode()",
+        "org.jsoup.parser.HtmlTreeBuilder.insert(Token.Comment)",
+        "org.jsoup.parser.HtmlTreeBuilder.parseFragment(String,Element,String,ParseErrorList,ParseSettings)",
+        "org.jsoup.Jsoup.parse(String,String)"
+    ]
+}

@@ -1,0 +1,75 @@
+{
+    "instructions": [
+        {
+            "role": "system",
+            "content": "You are a debugging assistant of our Java software. You will be presented with a bug report, a trigger test and tools (functions) to access the source code of the system under test (SUT). Your task is to locate the top-5 most likely culprit methods based on the bug report, the trigger test and the information you retrieve using given functions. \nFunction calls you can use are as follows.\n* get_code_snippet_of_method(`method_number`) -> Get the code snippet of the java method. `method_number` -> The number of the java methods suggested. *\n* exit() -> Exit function calling to give your final answer when you are confident of the answer.  *\nYou have 10 chances to call function."
+        },
+        {
+            "role": "user",
+            "content": "The bug report is as follows:\n```\nTitle:Allow convenient spying on abstract classes\nDescription:\nI posted this in GoogleCode and was asked to submit in github.\nMockito is easy to use when the test needs to provide canned values for a certain method.\nBut it gets harder when a canned value isn't sufficient.\nExample 1: Fake with trivial Logic\ninterface UserAccount {\n  List<String> getEmails();\n  void addEmail(String email);\n  // 12 other methods ...\n}\n\nWhen mocking such domain entity object, it's tedious to manually program getEmails()/addEmail() with when().thenReturn() and to make sure the two methods are logically consistent, that is, getEmails() returns all emails added.\nExample 2: callback-style API\ninterface AccountService {\n  void getAccount(String id, AsyncCallback<UserAccount> callback);\n}\n\nStubbing AccountService isn't easy. It'd require use of Answer, and the Answer API isn't statically type safe:\nwhen(service.getAccount(eq(id), any(AsyncCallback.class)).thenAnswer(new Answer<Void>() {\n  AsyncCallback<UserAccount> callback = (AsyncCallback<UserAccount>) getArguments()[1];\n  ...\n});\n\nExample 3: Uninteresting parameters\ninterface AccountRpcService {\n  FutureAccount getAccount(RpcContext context, String id);\n}\n\nNone of the tests care about the context object. It's an uninteresting parameter imposed by the framework.\nIf AccountRpcService were directly mocked, all tests would have to use isA() to repetitively mention this uninteresting parameter, like this:\nwhen(service.getAccount(isA(RpcContext.class), eq(\"id\")).thenReturn(...);\nAnd all other parameters are required to be wrapped in eq().\nProposal\nI propose adding support for abstract classes to mockito to make it easier to deal with tests like above:\nFor example 1\nabstract class FakeUserAccount implements UserAccount {\n  private final List<String> emails = new ArrayList<>();\n\n  @Override public void addEmail(String email) {\n    emails.add(email);\n  }\n  @Override List<String> getEmails() {\n    return ImmutableList.copyOf(emails);\n  }\n}\n\n@Fake private FakeUserAccount userAccount; // Mockito instantiates abstract class.\n\nFor example 2\nabstract class MockAccountService implements AccountService {\n  @Override public void getAccount(String id, AsyncCallback<UserAccount> callback) {\n    callback.onSuccess(getAccount(id));\n  }\n  abstract UserAccount getAccount(String id);\n}\n\n@Fake private MockAccountService service;\n\n...\n\nwhen(service.getAccount(\"id\")).thenReturn(account);\n\nFor example 3\nabstract class MockAccountRpcService implements AccountRpcService {\n  @Override Future<Account> getAccount(RpcContext context, String id) {\n    checkNotNull(context);  // Common sanity test. Don't have to repeat it in tests.\n    return getAccount(id);\n  }\n\n  abstract Future<Account> getAccount(String id);\n}\n\n@Fake private MockAccountRpcService service;\n\nwhen(service.getAccount(\"id\")).thenReturn(...);\n\nMy work place internally implemented a default Answer to support abstract classes. We found that the support of abstract classes helps us to avoid overusing mocks when we should be using fakes. And in situations like above we get cleaner test code.\nBut because it's not integrated in the core Mockito, there are gotchas with our implementation (like, you can't have private/final methods in your fake).\nIf the idea sounds okay to give a try, I'll volunteer to submit a patch.\nThanks!\n\n```\nThe trigger test is as follows:\n```\npublic void creates_instances_of_inner_classes() {\n        assertEquals(new ConstructorInstantiator(this).newInstance(SomeInnerClass.class).getClass(), SomeInnerClass.class);\n        assertEquals(new ConstructorInstantiator(new ChildOfThis()).newInstance(SomeInnerClass.class).getClass(), SomeInnerClass.class);\nThe last line shown above failed with the following stack trace.\norg.mockito.internal.creation.instance.InstantationException: Unable to create mock instance of 'SomeInnerClass'.\nPlease ensure that the outer instance has correct type and that the target class has parameter-less constructor.\n\tat org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(ConstructorInstantiator.java:33)\n\tat org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(ConstructorInstantiator.java:27)\n\tat org.mockito.internal.creation.instance.ConstructorInstantiator.newInstance(ConstructorInstantiator.java:17)\n\tat org.mockito.internal.creation.instance.ConstructorInstantiatorTest.creates_instances_of_inner_classes(ConstructorInstantiatorTest.java:21)\n\tat org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(ConstructorInstantiator.java:24)\n```\nThe suggested methods are as follows:\n```\n1.org.mockito.Mockito.spy(Class<T>)\n2.org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(Class<T>)\n3.org.mockito.internal.configuration.ClassPathLoader.loadImplementations(Class<T>)\n4.org.mockito.Mockito.spy(T)\n5.org.mockito.Mockito.doCallRealMethod()\n6.org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>,Exception)\n7.org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(Class<T>)\n8.org.mockito.internal.creation.instance.InstantationException.InstantationException(String,Throwable)\n9.org.mockito.internal.creation.instance.ConstructorInstantiator.ConstructorInstantiator(Object)\n10.org.mockito.internal.creation.instance.ConstructorInstantiator.newInstance(Class<T>)\n11.org.mockito.Mockito.ignoreStubs(Object)\n12.org.mockito.AdditionalAnswers.delegatesTo(Object)\n13.org.mockito.Mockito.reset(T)\n14.org.mockito.internal.configuration.ClassPathLoader.loadImplementations(Class<T>)\n15.org.mockito.internal.configuration.ClassPathLoader.findPluginImplementation(Class<T>,String)\n16.org.mockito.internal.creation.instance.ConstructorInstantiator.newInstance(Class<T>)\n17.org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(Class<T>)\n18.org.mockito.internal.creation.instance.ConstructorInstantiator.noArgConstructor(Class<T>)\n19.org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>,Exception)\n20.org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>,Exception)\n```\nLet's locate the faulty method step by step using reasoning and function calls. Now reason and plan how to locate the buggy methods."
+        },
+        {
+            "role": "Assistant",
+            "content": "Based on the bug report and the trigger test, I can identify the following key points:\n\n1. The bug report is about adding support for abstract classes in Mockito, and the author proposes a solution using abstract classes as fakes.\n2. The trigger test is about creating instances of inner classes, and it fails with an InstantiationException.\n3. The suggested methods are related to Mockito's internal implementation, such as spy, constructor instantiation, and exception handling.\n\nTo locate the faulty method, I will use the following plan:\n\n1. Start by analyzing the trigger test and identifying the specific line that fails. In this case, it's the last line that fails with an InstantiationException.\n2. Use the function calls to retrieve the code snippet of the method that is being called when the test fails. In this case, I will call `get_code_snippet_of_method(10)` to get the code snippet of the `ConstructorInstantiator.newInstance` method.\n3. Analyze the code snippet to understand what it does and how it relates to the bug report and the trigger test.\n4. Based on the analysis, I will identify the most likely culprit methods that are related to the bug and the trigger test.\n5. I will use the function calls to retrieve the code snippets of these methods and analyze them further to identify the root cause of the bug.\n\nBased on this plan, my first step is to call `get_code_snippet_of_method(10)` to get the code snippet of the `ConstructorInstantiator.newInstance` method."
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(10)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.creation.instance.ConstructorInstantiator.newInstance(Class<T>) is as follows.\npublic <T> T newInstance(Class<T> cls) {\t        if (outerClassInstance == null) {\t            return noArgConstructor(cls);\t        }\t        return withOuterClass(cls);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(7)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(Class<T>) is as follows.\nprivate <T> T withOuterClass(Class<T> cls) {\t        try {\t            //this is kind of overengineered because we don't need to support more params\t            //however, I know we will be needing it :)\t            Constructor<T> c = cls.getDeclaredConstructor(outerClassInstance.getClass());\t            return c.newInstance(outerClassInstance);\t        } catch (Exception e) {\t            throw paramsException(cls, e);\t        }\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "get_code_snippet_of_method(19)"
+        },
+        {
+            "role": "user",
+            "content": "The code snippet of org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>,Exception) is as follows.\nprivate static <T> InstantationException paramsException(Class<T> cls, Exception e) {\t        return new InstantationException(\"Unable to create mock instance of '\"\t                + cls.getSimpleName() + \"'.\\nPlease ensure that the outer instance has correct type and that the target class has parameter-less constructor.\", e);\t    }"
+        },
+        {
+            "role": "user",
+            "content": "Now call a function in this format `FunctionName(Argument)` in a single line without any other word."
+        },
+        {
+            "role": "Assistant",
+            "content": "exit()"
+        },
+        {
+            "role": "user",
+            "content": "Based on the available information, provide complete name of the top-5 most likely culprit methods for the bug please. Since your answer will be processed automatically, please give your answer in the format as follows.\nTop_1 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_2 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_3 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_4 : PathName.ClassName.MethodName(ArgType1, ArgType2)\nTop_5 : PathName.ClassName.MethodName(ArgType1, ArgType2)\n"
+        },
+        {
+            "role": "Assistant",
+            "content": "Top_1 : org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(Class<T>)\nTop_2 : org.mockito.internal.creation.instance.ConstructorInstantiator.newInstance(Class<T>)\nTop_3 : org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>, Exception)\nTop_4 : org.mockito.internal.creation.instance.ConstructorInstantiator.noArgConstructor(Class<T>)\nTop_5 : org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>, Exception)"
+        }
+    ],
+    "fl_results": [
+        "org.mockito.internal.creation.instance.ConstructorInstantiator.withOuterClass(Class<T>)",
+        "org.mockito.internal.creation.instance.ConstructorInstantiator.newInstance(Class<T>)",
+        "org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>,Exception)",
+        "org.mockito.internal.creation.instance.ConstructorInstantiator.noArgConstructor(Class<T>)",
+        "org.mockito.internal.creation.instance.ConstructorInstantiator.paramsException(Class<T>,Exception)"
+    ]
+}

@@ -1,0 +1,37 @@
+public void testCustomEnumKeySerializerWithPolymorphic() throws IOException
+    {
+        SimpleModule simpleModule = new SimpleModule();
+        simpleModule.addDeserializer(SuperTypeEnum.class, new JsonDeserializer<SuperTypeEnum>() {
+            @Override
+            public SuperTypeEnum deserialize(JsonParser p, DeserializationContext deserializationContext)
+                    throws IOException
+            {
+                return SuperTypeEnum.valueOf(p.getText());
+            }
+        });
+        ObjectMapper mapper = new ObjectMapper()
+                .registerModule(simpleModule);
+
+        SuperType superType = mapper.readValue("{\"someMap\": {\"FOO\": \"bar\"}}",
+The last line shown above failed with the following stack trace.
+com.fasterxml.jackson.databind.exc.InvalidFormatException: Can not deserialize Map key of type com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer$SuperTypeEnum from String "FOO": not a valid representation: No enum constant com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer.SuperTypeEnum.}
+ at [Source: {"someMap": {"FOO": "bar"}}; line: 1, column: 27] (through reference chain: com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer$SuperType["someMap"])
+	at com.fasterxml.jackson.databind.exc.InvalidFormatException.from(InvalidFormatException.java:74)
+	at com.fasterxml.jackson.databind.DeserializationContext.weirdKeyException(DeserializationContext.java:1389)
+	at com.fasterxml.jackson.databind.DeserializationContext.handleWeirdKey(DeserializationContext.java:880)
+	at com.fasterxml.jackson.databind.deser.std.StdKeyDeserializer$DelegatingKD.deserializeKey(StdKeyDeserializer.java:322)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer._readAndBind(MapDeserializer.java:445)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer.deserialize(MapDeserializer.java:365)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer.deserialize(MapDeserializer.java:27)
+	at com.fasterxml.jackson.databind.deser.SettableBeanProperty.deserialize(SettableBeanProperty.java:499)
+	at com.fasterxml.jackson.databind.deser.impl.FieldProperty.deserializeAndSet(FieldProperty.java:108)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.vanillaDeserialize(BeanDeserializer.java:276)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeOther(BeanDeserializer.java:178)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:150)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer._deserializeTypedUsingDefaultImpl(AsPropertyTypeDeserializer.java:146)
+	at com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer.deserializeTypedFromObject(AsPropertyTypeDeserializer.java:105)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.deserializeWithType(BeanDeserializerBase.java:1089)
+	at com.fasterxml.jackson.databind.deser.impl.TypeWrappedDeserializer.deserialize(TypeWrappedDeserializer.java:63)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3798)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2842)
+	at com.fasterxml.jackson.databind.module.TestCustomEnumKeyDeserializer.testCustomEnumKeySerializerWithPolymorphic(TestCustomEnumKeyDeserializer.java:221)
