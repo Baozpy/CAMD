@@ -76,7 +76,7 @@ The failure tree is therefore:
 
 Of the 27 K=10 retrieval misses, **15** are recoverable by expanding the frozen candidate pool to K<=100.
 
-Observed recovered GT methods: **18**
+Observed recovered GT methods: **18 across 15 recovered bugs**
 - Minimum pool/base rank: **23**
 - Maximum pool/base rank: **96**
 - Mean rank: **56.83**
@@ -123,7 +123,7 @@ The Critic/Judge stage improved the development set but did not generalize to th
 1. **Candidate retrieval is the dominant bottleneck.** 27 of 31 Detector Top-1 failures originate before LLM verification.
 2. **The Detector is strong once GT is retrieved.** Conditional Top-1 reaches 94.37%.
 3. **Additional multi-agent deliberation does not improve held-out performance.**
-4. **Candidate depth matters.** 15 of 27 K=10 misses become reachable by K<=100.
+4. **Candidate depth matters.** 15 of 27 K=10 misses become reachable in the current frozen candidate pools by K<=100.
 5. **The recoverable failures are base-ranking failures.** All observed recovered GT methods were admitted by the base retriever.
 6. **Future work should prioritize efficient reranking and candidate coverage**, while separately investigating the 12 cases still absent at K=100.
 
