@@ -194,7 +194,7 @@ where $T$ denotes failing-test evidence.
 The candidate pool is:
 
 $$
-\mathcal{C}_K = \operatorname{TopK}_{m_i \in \mathcal{M}_b} R(m_i, T)
+\mathcal{C}_K = \text{TopK}_{m_i \in \mathcal{M}_b} R(m_i, T)
 $$
 
 
