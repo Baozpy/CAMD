@@ -179,30 +179,30 @@ assuming that the modified class is known in advance.
 
 Let the buggy program contain methods:
 
-\[
+$$
 \mathcal{M}_b = \{m_1, m_2, \ldots, m_n\}
-\]
+$$
 
 CAMD assigns each method a retrieval score:
 
-\[
+$$
 R(m_i, T)
-\]
+$$
 
-where \(T\) denotes failing-test evidence.
+where $T$ denotes failing-test evidence.
 
 The candidate pool is:
 
-\[
+$$
 \mathcal{C}_K
 =
 \operatorname{TopK}_{m_i \in \mathcal{M}_b}
 R(m_i, T)
-\]
+$$
 
 The initial retriever combines multiple signals:
 
-\[
+$$
 R_i
 =
 0.35 S_{\text{direct}}
@@ -214,7 +214,7 @@ R_i
 0.10 S_{\text{test-name}}
 +
 0.15 S_{\text{lexical}}
-\]
+$$
 
 These signals capture:
 
@@ -382,18 +382,18 @@ The Detector evaluates each retrieved method independently using:
 
 Conceptually:
 
-\[
+$$
 d_i
 =
 D(m_i, T, C_i, E_i)
-\]
+$$
 
 where:
 
-- \(m_i\) is the candidate method
-- \(T\) is failing-test evidence
-- \(C_i\) is source/context information
-- \(E_i\) is retrieval and structural evidence
+- $m_i$ is the candidate method
+- $T$ is failing-test evidence
+- $C_i$ is source/context information
+- $E_i$ is retrieval and structural evidence
 
 The Detector returns a structured assessment:
 
@@ -435,15 +435,15 @@ between:
 
 The Critic computes:
 
-\[
+$$
 c_i
 =
 C(m_i, T, d_i)
-\]
+$$
 
 The Judge then considers both analyses:
 
-\[
+$$
 s_i
 =
 J(
@@ -452,13 +452,13 @@ m_i,
 d_i,
 c_i
 )
-\]
+$$
 
 where:
 
-- \(d_i\) is the Detector assessment
-- \(c_i\) is the Critic assessment
-- \(s_i\) is the final Judge score
+- $d_i$ is the Detector assessment
+- $c_i$ is the Critic assessment
+- $s_i$ is the final Judge score
 
 ---
 
