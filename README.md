@@ -1,899 +1,838 @@
 # CAMD: Context-Aware Multi-Agent Software Defect Detection with Large Language Models
 
-CAMD is a research-oriented software defect localization framework that combines **large language models, program context, static analysis, and multi-agent verification** to identify defective methods and localize suspicious code in real-world Java projects.
+CAMD is a program-wide software defect localization framework that combines
+evidence-aware candidate retrieval with large language model reasoning.
 
-Rather than asking a single LLM to inspect an entire source file, CAMD decomposes defect localization into multiple stages:
+The project studies a practical question in LLM-based defect localization:
 
-1. candidate method extraction,
-2. context-aware candidate ranking,
-3. static evidence construction,
-4. multi-agent defect verification,
-5. line-level localization,
-6. adaptive candidate expansion.
+> Given a failing test and an entire buggy program, how can we efficiently identify the method most likely responsible for the failure?
 
-The project is evaluated on real bugs from **Defects4J**, with Apache Commons Lang used as the primary experimental target.
+Unlike oracle-style settings that assume the buggy class is already known,
+CAMD searches over production methods across the program, constructs a
+candidate shortlist using failing-test and structural evidence, and then
+applies an LLM-based Detector to perform evidence-grounded defect localization.
 
-In addition to the main CAMD pipeline, the repository contains **local QLoRA fine-tuning baselines using Qwen3.5-9B**, including both binary defect classification and pairwise ranking objectives.
+The frozen CAMD v1 results show that the dominant bottleneck is
+**candidate retrieval**, rather than additional multi-agent deliberation.
 
 ---
 
-## 1. Motivation
+## Overview
 
-Large language models can analyze source code and reason about software defects, but directly applying an LLM to defect localization introduces several problems:
+The primary CAMD v1 inference pipeline is:
 
-- large source files exceed practical context budgets;
-- irrelevant methods introduce substantial noise;
-- failing-test information is not always explicitly connected to suspicious methods;
-- LLM predictions may be unstable;
-- a single model judgment may produce false positives;
-- the actual defective method may fall outside a small initial candidate set;
-- identifying the correct method does not necessarily identify the exact faulty statement.
+```text
+Whole Program
+     |
+     v
+Failing Test Evidence
+     |
+     v
+Program-Wide Candidate Retrieval
+     |
+     +---- lexical / test-name evidence
+     |
+     +---- class / method evidence
+     |
+     +---- stack-trace evidence
+     |
+     +---- call-chain augmentation
+     |
+     v
+Top-K Candidate Methods
+     |
+     v
+LLM Detector
+     |
+     v
+Ranked Defect Candidates
+```
 
-CAMD addresses these issues by treating defect localization as a structured pipeline rather than a single LLM call.
+CAMD also implements an additional multi-agent verification stage:
 
-The core idea is:
+```text
+Detector
+   |
+   v
+Critic
+   |
+   v
+Judge
+```
+
+This stage is retained as an experimental ablation.
+
+On the development set, Critic + Judge improved localization performance.
+However, the improvement did not transfer to the frozen held-out benchmark.
+
+Therefore, the recommended CAMD v1 inference path is:
+
+```text
+Program-Wide Retrieval
+        +
+LLM Detector
+```
+
+---
+
+# Key Results
+
+CAMD is evaluated on five Defects4J projects:
+
+- Apache Commons Lang
+- Apache Commons Math
+- JFreeChart
+- Joda-Time
+- Mockito
+
+The frozen benchmark contains:
+
+- 100 selected bugs
+- 100 processable bugs
+- 98 existing-method localization cases
+- 2 method-addition defects
+
+The two method-addition defects are retained in the benchmark artifact but are
+excluded from existing-method localization metrics because the corresponding
+buggy methods do not exist in the buggy revision.
+
+The main reported localization results therefore use:
+
+```text
+N = 98 method-applicable bugs
+```
+
+---
+
+## Final End-to-End Localization
+
+| Method | Top-1 | Top-3 | Top-5 | Top-10 | MRR |
+|---|---:|---:|---:|---:|---:|
+| Retriever + Detector | **68.37%** | **72.45%** | **72.45%** | **72.45%** | **0.7024** |
+| Retriever + Detector + Critic + Judge | 67.35% | 72.45% | 72.45% | 72.45% | 0.6990 |
+
+The primary CAMD v1 result is:
+
+```text
+Detector Top-1:
+67 / 98 = 68.37%
+```
+
+---
+
+## Conditional Localization Performance
+
+Among the 71 bugs whose ground-truth method is successfully retrieved into the
+Detector Top-10 shortlist:
+
+| Method | Conditional Top-1 | Conditional Top-3 | Conditional MRR |
+|---|---:|---:|---:|
+| Detector | **94.37%** | **100.00%** | **0.9695** |
+| Critic + Judge | 92.96% | 100.00% | 0.9648 |
+
+In other words:
+
+```text
+Detector conditional Top-1:
+67 / 71 = 94.37%
+```
+
+This indicates that once the correct method is available to the LLM,
+the Detector is already highly effective.
+
+The main limitation is therefore not primarily LLM verification quality,
+but whether the retrieval stage can expose the correct method to the Detector.
+
+---
+
+# Main Finding
+
+The 31 Detector Top-1 failures decompose into:
+
+```text
+31 total Detector Top-1 failures
+|
++-- 27 retrieval failures
+|
++-- 4 Detector ranking failures after successful retrieval
+```
+
+Therefore:
+
+```text
+Retrieval-related failures: 27 / 31 = 87.10%
+Detector-ranking failures:   4 / 31 = 12.90%
+```
+
+This leads to the central empirical finding of CAMD v1:
+
+> Candidate retrieval is the dominant bottleneck in program-wide LLM-based defect localization.
+
+---
+
+# Candidate Retrieval
+
+## Program-Wide Search
+
+For each bug, CAMD considers production methods across the program rather than
+assuming that the modified class is known in advance.
+
+Let the buggy program contain methods:
+
+\[
+\mathcal{M}_b = \{m_1, m_2, \ldots, m_n\}
+\]
+
+CAMD assigns each method a retrieval score:
+
+\[
+R(m_i, T)
+\]
+
+where \(T\) denotes failing-test evidence.
+
+The candidate pool is:
+
+\[
+\mathcal{C}_K
+=
+\operatorname{TopK}_{m_i \in \mathcal{M}_b}
+R(m_i, T)
+\]
+
+The initial retriever combines multiple signals:
+
+\[
+R_i
+=
+0.35 S_{\text{direct}}
++
+0.20 S_{\text{class}}
++
+0.20 S_{\text{name}}
++
+0.10 S_{\text{test-name}}
++
+0.15 S_{\text{lexical}}
+\]
+
+These signals capture:
+
+- direct test references
+- class-name similarity
+- method-name similarity
+- test-name overlap
+- lexical similarity
+
+---
+
+## Structural Evidence Augmentation
+
+CAMD additionally augments the base candidate ranking using structural evidence.
+
+The current structural expansion includes:
 
 ```text
 Failing Test
-     |
-     v
-Context Extraction
-     |
-     v
-Candidate Method Generation
-     |
-     v
-Context-Aware Ranking
-     |
-     v
-Static Evidence
-     |
-     v
-Detector
-     |
-     v
-Critic
-     |
-     v
-Judge
-     |
-     v
-Method Ranking
-     |
-     +----------------------+
-     |                      |
-     v                      v
-Line Localization     Adaptive Expansion
-```
-
----
-
-# 2. Main Research Questions
-
-CAMD investigates several questions.
-
-### RQ1 — Can method-level decomposition improve LLM-based defect localization?
-
-Instead of feeding an entire class to the model, CAMD extracts individual Java methods and ranks them as candidate defect locations.
-
-### RQ2 — Does execution-related context improve candidate ranking?
-
-CAMD incorporates failing-test information and expanded test context when evaluating suspicious methods.
-
-### RQ3 — Can static analysis complement LLM reasoning?
-
-AST-derived evidence is added to candidate representations to expose structural properties such as branches, calls, comparisons, null checks, and exceptions.
-
-### RQ4 — Can multi-agent verification reduce unreliable single-model decisions?
-
-CAMD uses separate Detector, Critic, and Judge roles rather than trusting a single prediction.
-
-### RQ5 — What happens when the true defective method is outside the initial candidate set?
-
-CAMD includes adaptive candidate expansion that increases the search depth when confidence remains low.
-
-### RQ6 — Does lightweight QLoRA fine-tuning improve defect localization?
-
-Binary and pairwise QLoRA baselines are evaluated separately from the main CAMD pipeline.
-
----
-
-# 3. CAMD Pipeline
-![Pipeline](data/pipeline.png)
-
-## 3.1 Method-Level Decomposition
-
-Java source files are parsed into individual methods.
-
-Each method is represented using information including:
-
-```text
-class name
-method name
-start line
-end line
-source code
-```
-
-This reduces irrelevant context and allows defect localization to operate at method granularity.
-
----
-
-## 3.2 Failing-Test Context
-
-CAMD extracts failing tests from Defects4J and expands the available test context.
-
-The context may include:
-
-- failing test name,
-- failing test method,
-- direct helper methods,
-- assertion context,
-- test-related call structure.
-
-For example:
-
-```text
-Failing test
     |
-    +-- test method
+    v
+Stack Evidence
     |
-    +-- directly referenced helper methods
+    v
+Test Helper Closure
+    |
+    v
+Typed Entry Resolution
+    |
+    v
+Inheritance-Aware Expansion
+    |
+    v
+Virtual Dispatch / Call-Chain Expansion
 ```
 
-This provides a stronger semantic connection between observed failure behavior and candidate production code.
+The frozen call-chain configuration uses bounded traversal depths to avoid
+uncontrolled candidate explosion.
+
+Structural evidence improves candidate recall in the retrieval development
+experiments, particularly at small candidate budgets.
 
 ---
 
-## 3.3 Static Analysis Evidence
+# Retrieval Results
 
-Each candidate method is analyzed using AST-based static analysis.
+## Original First Held-Out Retrieval Run
 
-Example evidence:
+| Candidate Budget | Recall |
+|---:|---:|
+| 10 | 71/98 = **72.45%** |
+| 20 | 71/98 = **72.45%** |
+| 50 | 79/98 = **80.61%** |
+| 100 | 86/98 = **87.76%** |
+
+---
+
+## Current Frozen Candidate-Pool Artifact
+
+| Candidate Budget | Recall |
+|---:|---:|
+| 10 | 71/98 = **72.45%** |
+| 20 | 71/98 = **72.45%** |
+| 50 | 80/98 = **81.63%** |
+| 100 | 86/98 = **87.76%** |
+
+### Audit Note
+
+The original unbiased first final retrieval run reported:
 
 ```text
-Structural summary:
-- Conditional branches
-- Loops
-- Return statements
-- Throw statements
-
-Method calls:
-- get
-- parse
-- compare
-
-Comparisons:
-- value == null
-- index >= length
-
-Null checks:
-- object == null
-
-Thrown exceptions:
-- IllegalArgumentException
+Recall@50 = 79 / 98
 ```
 
-Static evidence is intended to complement semantic LLM reasoning rather than replace it.
-
----
-
-# 4. Context-Aware Candidate Ranking
-
-Candidate methods are ranked before expensive multi-agent verification.
-
-The ranking stage combines information such as:
-
-- failing-test relevance,
-- class and method relationships,
-- static evidence,
-- candidate structure,
-- code context.
-
-This produces a ranked candidate pool:
+The later frozen candidate-pool export reports:
 
 ```text
-Candidate 1
-Candidate 2
-Candidate 3
-...
-Candidate K
+Recall@50 = 80 / 98
 ```
 
-Only the highest-ranked candidates are initially sent to the multi-agent verification stage.
+The difference is caused by `Mockito-25`.
+
+The historical first run observed seven failing tests for this bug, while
+subsequent stable exports observed six.
+
+Because failing-test evidence participates in retrieval scoring, the candidate
+ranking changed and the ground-truth method entered the current Top-50 pool.
+
+To preserve experimental integrity:
+
+- `79/98` is retained as the official first-run `Recall@50`
+- downstream verifier analyses use the internally consistent frozen candidate pools
+- no result was manually replaced based on favorable performance
 
 ---
 
-# 5. Multi-Agent Verification
+# Candidate-Depth Analysis
 
-CAMD uses three reasoning roles.
-
-## Detector
-
-The Detector performs the initial defect analysis.
-
-It evaluates whether the candidate method plausibly explains the current failing test.
+Among the 27 bugs missed at `K=10`:
 
 ```text
-Candidate Method
-      +
-Failing Test Context
-      +
-Static Evidence
-      |
-      v
-Detector
+27 K=10 retrieval misses
+|
++-- 9 first recovered at K=50
+|
++-- 6 first recovered at K=100
+|
++-- 12 still absent at K=100
 ```
 
+Thus:
+
+```text
+15 / 27 = 55.56%
+```
+
+of the Top-10 retrieval failures are recoverable in the current frozen
+candidate pools by increasing the candidate budget to at most 100 methods.
+
+These 15 cases represent **candidate-ranking depth failures**.
+
+The remaining 12 cases represent harder retrieval failures that require
+additional retrieval signals, representations, or structural evidence.
+
 ---
 
-## Critic
+## Recovered Ground-Truth Positions
 
-The Critic independently examines the Detector's reasoning and attempts to identify weaknesses such as:
+Across the 15 recovered bugs, 18 ground-truth methods were observed in the
+larger candidate pools.
 
-- unsupported assumptions,
-- weak causal connection to the failure,
-- alternative candidate explanations,
-- false-positive defect claims.
+Their positions are:
+
+```text
+Minimum rank: 23
+Maximum rank: 96
+Mean rank:    56.83
+Median rank:  42
+```
+
+All 18 recovered ground-truth methods entered through:
+
+```text
+base retrieval
+```
+
+rather than stack or call-chain augmentation.
+
+This suggests that these methods were already recognized by the retriever but
+were ranked too deeply for the Top-10 shortlist.
 
 ---
 
-## Judge
+# LLM Detector
 
-The Judge receives the available evidence and produces the final candidate assessment.
+The Detector evaluates each retrieved method independently using:
+
+- method source code
+- class and method identity
+- source-line information
+- failing-test information
+- stack-trace evidence
+- retrieval metadata
+- structural retrieval evidence
 
 Conceptually:
 
-```text
-Detector Analysis
-       +
-Critic Analysis
-       +
-Program Context
-       |
-       v
-     Judge
-       |
-       v
-Final defect probability
+\[
+d_i
+=
+D(m_i, T, C_i, E_i)
+\]
+
+where:
+
+- \(m_i\) is the candidate method
+- \(T\) is failing-test evidence
+- \(C_i\) is source/context information
+- \(E_i\) is retrieval and structural evidence
+
+The Detector returns a structured assessment:
+
+```json
+{
+  "hypothesis": "...",
+  "supporting_evidence": [
+    "..."
+  ],
+  "target_defect_probability": 0.0
+}
 ```
 
-The resulting Judge probability is used for final candidate ranking.
+Candidates are ranked using the Detector's estimated
+`target_defect_probability`.
 
 ---
 
-# 6. Adaptive Candidate Expansion
+# Multi-Agent Verification Ablation
 
-A fixed Top-K candidate pool can fail when the true defective method receives a low initial rank.
-
-CAMD therefore includes an adaptive search mechanism.
-
-Initial evaluation:
+CAMD also implements:
 
 ```text
-Top-5 candidates
+Detector
+   |
+   v
+Critic
+   |
+   v
+Judge
 ```
 
-If the best Judge probability remains below a predefined confidence threshold:
+The Critic challenges the Detector's explanation and attempts to distinguish
+between:
 
-```text
-best probability < 0.5
-```
+- a method that is merely on the failing execution path
+- an immediate symptom or throw site
+- the actual defect responsible for the current failing test
 
-CAMD expands the search:
+The Critic computes:
 
-```text
-Top-5
-  |
-  v
-Top-10
-  |
-  v
-Top-20
-```
+\[
+c_i
+=
+C(m_i, T, d_i)
+\]
 
-Expansion stops when:
+The Judge then considers both analyses:
 
-- confidence becomes sufficient, or
-- the candidate pool is exhausted.
+\[
+s_i
+=
+J(
+T,
+m_i,
+d_i,
+c_i
+)
+\]
 
-The mechanism is intended as a robustness extension rather than a replacement for the primary CAMD evaluation.
+where:
+
+- \(d_i\) is the Detector assessment
+- \(c_i\) is the Critic assessment
+- \(s_i\) is the final Judge score
 
 ---
 
-# 7. Method-Level Evaluation
+## Development vs Held-Out Result
 
-The main method-level experiments use Apache Commons Lang bugs from Defects4J.
+| Split | Detector Top-1 | Judge Top-1 | Delta |
+|---|---:|---:|---:|
+| Development | 85.71% | **92.86%** | +7.14 pp |
+| Frozen held-out benchmark | **68.37%** | 67.35% | -1.02 pp |
 
-Lang-2 and Lang-18 are deprecated, leaving:
+On development data, the multi-agent verifier corrected cases involving
+symptom-site confusion.
+
+For example, the Detector could rank an exception-validation method above a
+more plausible causal defect location, while the Critic recognized that the
+validation method was only the manifestation site.
+
+However, this gain did not generalize to the frozen held-out benchmark.
+
+Final transitions were:
 
 ```text
-18 valid bugs
+Corrected by Judge: 0
+Regressed by Judge: 1
 ```
 
-The evaluated set is:
+Therefore:
 
-```text
-Lang:
-1, 3, 4, 5, 6, 7, 8, 9, 10,
-11, 12, 13, 14, 15, 16, 17,
-19, 20
-```
-
-Metrics:
-
-- Mean Reciprocal Rank (MRR)
-- Top-1
-- Top-3
-- Top-5
-- Top-10
+> Critic + Judge is treated as an ablation rather than the primary CAMD inference path.
 
 ---
 
-# 8. Method-Level Results
+# Per-Project Failure Analysis
 
-## 8.1 Main CAMD Results
-
-| Method | MRR | Top-1 | Top-3 | Top-5 | Top-10 |
+| Project | Cases | Retrieval Success | Retrieval Miss | Detector Top-1 Correct | Detector Ranking Failure |
 |---|---:|---:|---:|---:|---:|
-| B1 | 0.6882 | 0.5556 | 0.7222 | 0.8889 | 0.9444 |
-| B4 | 0.7435 | 0.6111 | 0.7778 | 0.9444 | 0.9444 |
-| **CAMD** | **0.9444** | **0.9444** | **0.9444** | **0.9444** | **0.9444** |
-
-CAMD correctly places a target defective method at rank 1 for:
-
-```text
-17 / 18 valid Lang bugs
-```
-
-The remaining failure is primarily caused by candidate-generation recall rather than Judge misclassification.
+| Chart | 19 | 16 | 3 | 16 | 0 |
+| Lang | 19 | 16 | 3 | 16 | 0 |
+| Math | 20 | 16 | 4 | 13 | 3 |
+| Mockito | 20 | 12 | 8 | 12 | 0 |
+| Time | 20 | 11 | 9 | 10 | 1 |
 
 ---
 
-# 9. Adaptive Expansion Results
+## Lang
 
-The primary CAMD failure occurs on Lang-20.
-
-The relevant `join` overloads initially appear outside the Top-5 candidate pool.
-
-Observed baseline ranks included:
+Once the ground-truth method is retrieved:
 
 ```text
-join(...) -> B4 rank 17
-join(...) -> B4 rank 19
+Detector Top-1 = 16 / 16
 ```
 
-Adaptive expansion evaluates deeper candidates when Judge confidence remains low.
+All three Top-10 retrieval misses are recoverable by `K=50`.
 
-Final experimental summary:
-
-```text
-Evaluated bugs: 18
-
-Triggered:
-Lang-6
-Lang-20
-
-Candidate pool exhausted:
-Lang-6
-
-Recovered Top-1:
-Lang-20
-
-Extra candidates evaluated:
-15
-```
-
-Result:
-
-| Method | MRR | Top-1 | Top-3 | Top-5 | Top-10 | Top-20 |
-|---|---:|---:|---:|---:|---:|---:|
-| Base CAMD | 0.9444 | 0.9444 | 0.9444 | 0.9444 | 0.9444 | 0.9444 |
-| Adaptive CAMD | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
-
-> **Important:** the adaptive result is a preliminary robustness result on a small set of 18 Lang bugs. The primary CAMD result remains the non-adaptive result of MRR / Top-1 = 0.9444.
+This suggests that the Lang failures primarily result from candidate-depth
+limitations rather than Detector reasoning errors.
 
 ---
 
-# 10. Line-Level Localization
+## Chart
 
-After the defective method has been identified, CAMD performs line-level localization.
+Once retrieved:
 
-Three metrics are used.
+```text
+Detector Top-1 = 16 / 16
+```
 
-## Exact Line
-
-The predicted line must exactly match a changed line.
-
-## AST Statement
-
-A prediction is considered correct if it identifies the AST statement containing the changed code.
-
-This accounts for multi-line Java statements.
-
-## ±2 Line Window
-
-A prediction is considered correct if it lies within two lines of the ground-truth change.
+The remaining errors are primarily retrieval failures.
 
 ---
 
-# 11. Oracle Line-Level Results
+## Mockito
 
-Oracle experiments assume the correct defective method is already known.
+Once retrieved:
 
-| Metric | MRR | Top-1 | Top-3 | Top-5 | Top-10 |
-|---|---:|---:|---:|---:|---:|
-| Exact Line | 0.6667 | 0.6111 | 0.7778 | 0.7778 | 0.7778 |
-| AST Statement | **0.8699** | **0.8333** | **0.8889** | **0.9444** | **1.0000** |
-| ±2 Lines | 0.8722 | 0.8333 | 0.8889 | 0.9444 | 0.9444 |
+```text
+Detector Top-1 = 12 / 12
+```
 
-The difference between exact-line and AST-statement evaluation demonstrates that source-line matching can underestimate localization quality when a single statement spans multiple physical lines.
+The dominant difficulty is candidate coverage.
+
+At `K=10`, eight Mockito cases fail because no ground-truth method enters the
+candidate shortlist.
 
 ---
 
-# 12. End-to-End Line Localization
+## Time
 
-The complete pipeline includes both method localization and line localization.
-
-| Metric | MRR | Top-1 | Top-3 | Top-5 | Top-10 |
-|---|---:|---:|---:|---:|---:|
-| Exact Line | 0.6528 | 0.5556 | 0.7222 | 0.7778 | 0.8333 |
-| AST Statement | **0.7935** | **0.7222** | **0.8333** | **0.9444** | **0.9444** |
-| ±2 Lines | 0.8167 | 0.7778 | 0.8333 | 0.8889 | 0.8889 |
-
-Method-level Top-1:
+Time contains the largest number of retrieval failures:
 
 ```text
-0.9444
+9 / 20
 ```
 
-Line localization was attempted for:
+Several Time bugs remain absent even from the Top-100 candidate pool.
 
-```text
-17 bugs
-```
+This makes Time one of the most important projects for future retrieval
+analysis.
 
 ---
 
-# 13. QLoRA Baselines
+## Math
 
-CAMD also evaluates whether lightweight local fine-tuning can improve software defect localization.
-
-These experiments are intentionally kept **separate from the main CAMD method**.
-
-Base model:
+Math is the main project in which both retrieval and Detector ranking matter:
 
 ```text
-Qwen3.5-9B
+4 retrieval failures
+3 Detector ranking failures
 ```
 
-Training environment:
-
-```text
-Apple Silicon
-MLX / MLX-LM
-4-bit quantized model
-LoRA adapters
-```
-
-Final QLoRA configuration:
-
-```text
-Quantization:       4-bit
-LoRA layers:        2
-Batch size:         1
-Max sequence:       2048
-Gradient checkpointing: enabled
-Prompt masking:     enabled
-Learning rate:      1e-5
-Iterations:         20
-```
-
-Approximately:
-
-```text
-1.328M trainable parameters
-~0.015% of model parameters
-```
+It therefore exposes both candidate-coverage and LLM-ranking limitations.
 
 ---
 
-# 14. QLoRA Dataset Split
+# Post-Hoc Expansion Signal Analysis
 
-To avoid test leakage:
+After the frozen final evaluation, we analyzed whether Detector confidence may
+signal that the Top-10 shortlist is incomplete.
 
-```text
-Training / validation:
-Lang 21-65
+This analysis is **post-hoc** and is not used to claim a tuned final
+improvement.
 
-Final held-out test:
-Lang 1-20
-```
-
-Lang 1–20 are protected in the dataset-building pipeline and are excluded from training unless explicitly overridden.
-
-The final held-out binary set contains:
-
-```text
-18 valid bugs
-174 candidate methods
-24 positives
-150 negatives
-```
-
-Deprecated:
-
-```text
-Lang-2
-Lang-18
-```
-
-The held-out test set is not used for:
-
-- training,
-- validation,
-- checkpoint selection,
-- threshold selection,
-- prompt tuning,
-- sampling-ratio tuning,
-- hyperparameter tuning.
-
----
-
-# 15. Binary QLoRA
-
-The first fine-tuning objective independently classifies each candidate:
-
-```json
-{
-  "is_target_defect": true
-}
-```
-
-or:
-
-```json
-{
-  "is_target_defect": false
-}
-```
-
-Several class ratios were explored during validation:
-
-```text
-1 positive : 8 negatives
-1 positive : 4 negatives
-1 positive : 1 negative
-```
-
-The final binary QLoRA model uses balanced 1:1 hard-negative sampling.
-
----
-
-# 16. Binary QLoRA Held-Out Results
-
-Held-out Lang 1–20:
-
-```text
-18 valid bugs
-174 candidates
-```
-
-| Metric | Base Qwen | Binary QLoRA |
-|---|---:|---:|
-| Accuracy | **0.8391** | 0.8333 |
-| Precision | **0.4444** | 0.4390 |
-| Recall | 0.6667 | **0.7500** |
-| F1 | 0.5333 | **0.5538** |
-| Specificity | **0.8667** | 0.8467 |
-| Balanced Accuracy | 0.7667 | **0.7983** |
-| MRR | **0.8370** | 0.8369 |
-| Top-1 | 0.7778 | 0.7778 |
-| Top-3 | 0.8333 | 0.8333 |
-| Top-5 | 0.9444 | 0.9444 |
-
-QLoRA improves positive-defect sensitivity:
-
-```text
-Recall:
-0.6667 -> 0.7500
-
-F1:
-0.5333 -> 0.5538
-
-Balanced Accuracy:
-0.7667 -> 0.7983
-```
-
-However, method-level ranking remains effectively unchanged.
-
----
-
-# 17. Pairwise Ranking QLoRA
-
-Because binary classification does not directly optimize ranking, a second fine-tuning task was introduced.
-
-Each example contains two candidate methods from the same bug:
-
-```text
-Candidate A
-vs
-Candidate B
-```
-
-with one target defective method and one hard negative.
-
-The model learns:
-
-```json
-{
-  "preferred_candidate": "A"
-}
-```
-
-or:
-
-```json
-{
-  "preferred_candidate": "B"
-}
-```
-
-A/B ordering is deterministically balanced to prevent positional bias.
-
-Training data:
-
-```text
-200 pairs
-Preferred A: 100
-Preferred B: 100
-```
-
-Validation:
-
-```text
-52 pairs
-Preferred A: 26
-Preferred B: 26
-```
-
----
-
-# 18. Pairwise Held-Out Test
-
-Two held-out bugs cannot form positive-negative pairs:
-
-```text
-Lang-4
-Lang-19
-```
-
-because their sampled candidate pools contain only target methods.
-
-Therefore the pairwise held-out evaluation contains:
-
-```text
-16 pairable bugs
-84 pairs
-Preferred A: 42
-Preferred B: 42
-```
-
----
-
-# 19. Pairwise QLoRA Held-Out Results
-
-| Metric | Base Qwen | Pairwise QLoRA |
-|---|---:|---:|
-| Pair Accuracy | 0.8333 | **0.8690** |
-| Preferred-A Accuracy | 0.9286 | 0.9286 |
-| Preferred-B Accuracy | 0.7381 | **0.8095** |
-| Mean Gold Margin | 0.6313 | **0.6661** |
-| MRR | 0.8854 | 0.8854 |
-| Top-1 | 0.8125 | 0.8125 |
-| Top-3 | 1.0000 | 1.0000 |
-| Top-5 | 1.0000 | 1.0000 |
-
-Pairwise QLoRA improves local preference discrimination:
-
-```text
-Pair Accuracy:
-0.8333 -> 0.8690
-
-Preferred-B Accuracy:
-0.7381 -> 0.8095
-
-Mean Gold Margin:
-0.6313 -> 0.6661
-```
-
-However:
-
-```text
-MRR:
-0.8854 -> 0.8854
-
-Top-1:
-0.8125 -> 0.8125
-```
-
-The improvement in local pairwise discrimination does not translate into improved global candidate ranking.
-
----
-
-# 20. QLoRA Findings
-
-The QLoRA experiments reveal an important distinction between **local discrimination** and **global localization**.
-
-Binary QLoRA:
-
-```text
-better Recall / F1
-        |
-        v
-no ranking improvement
-```
-
-Pairwise QLoRA:
-
-```text
-better pair preference accuracy
-better confidence margin
-        |
-        v
-no ranking improvement
-```
-
-Overall:
-
-> QLoRA changes local defect discrimination and pairwise preference behavior, but these gains do not translate into better method-level localization ranking on the held-out Lang 1–20 benchmark.
-
-This result motivates the context-aware and multi-stage design used by CAMD.
-
----
-
-# 21. Summary of Main Results
-
-## Method Localization
-
-| Method | MRR | Top-1 | Top-3 | Top-5 |
+| Group | N | Mean Detector Top-1 Probability | Median | Mean Top1-Top2 Margin |
 |---|---:|---:|---:|---:|
-| B1 | 0.6882 | 0.5556 | 0.7222 | 0.8889 |
-| B4 | 0.7435 | 0.6111 | 0.7778 | 0.9444 |
-| **CAMD** | **0.9444** | **0.9444** | **0.9444** | **0.9444** |
-| Adaptive CAMD* | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| Retrieved at K=10 | 71 | 0.9441 | 0.9600 | 0.4513 |
+| First recovered at K=50 | 9 | 0.4189 | 0.3500 | 0.2100 |
+| First recovered at K=100 | 6 | 0.2100 | 0.2000 | 0.0300 |
+| Never recovered by K=100 | 12 | 0.5308 | 0.4700 | 0.1700 |
 
-`*` Preliminary adaptive robustness experiment on 18 Lang bugs.
+The recovered-at-100 group shows especially low Detector confidence when the
+correct method is absent from the Top-10 shortlist.
+
+However, some unrecovered cases still receive very high Detector confidence.
+
+Therefore:
+
+```text
+high Detector confidence
+!=
+guaranteed retrieval correctness
+```
+
+Future adaptive retrieval requires independent validation on a new held-out
+benchmark.
 
 ---
 
-## QLoRA Baselines
+# Final Failure Tree
 
-| Setting | Base | QLoRA |
-|---|---:|---:|
-| Binary Recall | 0.6667 | **0.7500** |
-| Binary F1 | 0.5333 | **0.5538** |
-| Binary MRR | 0.8370 | 0.8369 |
-| Binary Top-1 | 0.7778 | 0.7778 |
-| Pairwise Accuracy | 0.8333 | **0.8690** |
-| Pairwise Gold Margin | 0.6313 | **0.6661** |
-| Pairwise MRR | 0.8854 | 0.8854 |
-| Pairwise Top-1 | 0.8125 | 0.8125 |
+The complete CAMD v1 failure decomposition is:
+
+```text
+98 method-applicable bugs
+|
++-- 71 ground-truth method retrieved at K=10
+|   |
+|   +-- 67 Detector Top-1 correct
+|   |
+|   +-- 4 Detector ranking failures
+|
++-- 27 ground-truth method missing at K=10
+    |
+    +-- 9 first recovered at K=50
+    |
+    +-- 6 additional cases recovered at K=100
+    |
+    +-- 12 still absent at K=100
+```
+
+Equivalently, the 31 end-to-end Detector failures can be decomposed into:
+
+```text
+31 failures
+|
++-- 15 recoverable candidate-depth failures
+|
++-- 12 unresolved retrieval failures
+|
++-- 4 Detector ranking failures
+```
+
+This decomposition motivates future work on retrieval and efficient reranking.
 
 ---
 
-# 22. Repository Structure
+# Frozen CAMD v1 Conclusions
 
-A simplified project structure is shown below.
+The frozen held-out results support the following conclusions:
+
+1. **Program-wide candidate retrieval is the dominant bottleneck.**
+
+   27 of 31 Detector Top-1 failures occur because the correct method is absent
+   from the Top-10 shortlist.
+
+2. **The Detector is strong once the correct candidate is retrieved.**
+
+   Conditional Top-1 reaches:
+
+   ```text
+   67 / 71 = 94.37%
+   ```
+
+3. **Additional multi-agent deliberation does not improve held-out performance.**
+
+   Critic + Judge improves development performance but slightly reduces
+   held-out Top-1.
+
+4. **Candidate depth matters.**
+
+   15 of the 27 Top-10 retrieval misses become reachable in the current frozen
+   candidate pools by `K <= 100`.
+
+5. **Recoverable cases are primarily ranking-depth failures.**
+
+   Every observed recovered ground-truth method entered through base retrieval.
+
+6. **Future improvements should prioritize candidate ranking and efficient reranking.**
+
+   Running an expensive LLM over all Top-100 methods is unnecessary if a cheap
+   second-stage reranker can compress the candidate set before Detector
+   inference.
+
+---
+
+# Recommended Future Direction
+
+A natural CAMD v2 architecture is:
+
+```text
+Whole Program
+     |
+     v
+Cheap Base Retrieval
+     |
+     v
+Top-100 Candidate Pool
+     |
+     v
+Cheap Second-Stage Reranker
+     |
+     v
+Top-10 Candidate Pool
+     |
+     v
+LLM Detector
+```
+
+A possible adaptive variant is:
+
+```text
+Top-10 Retrieval
+     |
+     v
+LLM Detector
+     |
+     v
+Uncertainty / Coverage Gate
+     |
+     +------ confident ------> return result
+     |
+     +------ uncertain
+               |
+               v
+       Expand to Top-50 / Top-100
+               |
+               v
+          Cheap Reranker
+               |
+               v
+          LLM Detector
+```
+
+The confidence-gating idea is currently only a hypothesis generated from
+post-hoc analysis and requires a new held-out evaluation before it can be
+reported as an improvement.
+
+---
+
+# Repository Structure
+
+A simplified repository structure is:
 
 ```text
 CAMD/
-│
 ├── camd/
-│   ├── context/
-│   │   └── method_extractor.py
+│   ├── agents/
+│   │   ├── detector_agent.py
+│   │   ├── critic_agent.py
+│   │   ├── judge_agent.py
+│   │   └── models.py
 │   │
-│   ├── evaluation/
-│   │   ├── diff_ground_truth.py
-│   │   ├── failing_test_extractor.py
-│   │   └── test_context_builder.py
+│   ├── llm/
+│   │   └── client.py
 │   │
-│   ├── static/
-│   │   ├── ast_analyzer.py
-│   │   └── evidence_builder.py
+│   ├── retrieval/
+│   │   ├── program_method_retriever.py
+│   │   └── call_chain_retriever.py
 │   │
-│   └── finetuning/
-│       ├── dataset_builder.py
-│       └── pairwise_dataset_builder.py
-│
-├── scripts/
-│   ├── run_baseline_batch.py
-│   │
-│   ├── build_qlora_dataset.py
-│   ├── prepare_mlx_dataset.py
-│   ├── evaluate_qlora.py
-│   │
-│   ├── build_pairwise_dataset.py
-│   ├── prepare_pairwise_mlx_dataset.py
-│   ├── evaluate_pairwise_qlora.py
-│   ├── evaluate_pairwise_bt.py
-│   │
-│   ├── build_heldout_qlora_test.py
-│   ├── prepare_heldout_mlx_test.py
-│   ├── build_heldout_pairwise_test.py
-│   ├── prepare_heldout_pairwise_mlx_test.py
-│   │
-│   └── build_qlora_final_summary.py
+│   └── verification/
+│       ├── frozen_candidate_loader.py
+│       ├── detector.py
+│       ├── critic.py
+│       └── judge.py
 │
 ├── data/
-│   ├── defects4j/
-│   │   └── checkouts/
-│   │
-│   └── finetuning/
-│       ├── train.jsonl
-│       ├── validation.jsonl
-│       ├── dataset_manifest.json
-│       │
-│       ├── pairwise/
-│       ├── pairwise_mlx/
-│       │
-│       └── heldout_lang_1_20/
-│           ├── test.jsonl
-│           ├── test_manifest.json
-│           ├── mlx/
-│           ├── pairwise/
-│           └── pairwise_mlx/
+│   └── defects4j/
+│       ├── fse_ase_benchmark_v1.json
+│       ├── fse_ase_retrieval_dev_v1.json
+│       └── checkouts/
+│
+├── external/
+│   └── defects4j/
 │
 ├── results/
 │   ├── baseline_predictions.jsonl
 │   │
 │   ├── defects4j/
-│   │   ├── Lang_1_20_final_summary.json
-│   │   └── Lang_1_20_adaptive_summary.json
+│   │   ├── fse_ase_final_retrieval_results.json
+│   │   ├── fse_ase_frozen_candidate_pools.json
+│   │   └── fse_ase_retrieval_dev_frozen_candidate_pools.json
 │   │
-│   └── qlora/
-│       ├── heldout_binary_base_lang1_20.json
-│       ├── heldout_binary_qlora11_lang1_20.json
-│       ├── heldout_pairwise_base_lang1_20.json
-│       ├── heldout_pairwise20_lang1_20.json
-│       └── final_summary.json
+│   └── verification/
+│       ├── detector/
+│       ├── verifier_dev/
+│       └── final/
+│           ├── detector/
+│           ├── verifier/
+│           ├── final_verifier_summary.json
+│           ├── final_failure_analysis.json
+│           ├── candidate_recovery_analysis.json
+│           ├── recovered_candidate_positions.json
+│           ├── expansion_signal_analysis.json
+│           ├── camd_final_experiment_summary.json
+│           └── CAMD_FINAL_RESULTS.md
 │
-├── external/
-│   └── defects4j/
-│
-├── adapters/
-├── models/
-├── hf_home/
+├── scripts/
+│   ├── run_baseline_batch.py
+│   ├── evaluate_candidate_retrieval.py
+│   ├── evaluate_final_retrieval.py
+│   ├── export_frozen_candidate_pools.py
+│   ├── run_frozen_detector.py
+│   ├── evaluate_detector_case.py
+│   ├── run_detector_dev_batch.py
+│   ├── evaluate_detector_dev.py
+│   ├── run_verifier_dev_batch.py
+│   ├── evaluate_verifier_dev.py
+│   ├── analyze_final_failures.py
+│   ├── analyze_candidate_recovery.py
+│   ├── analyze_recovered_candidate_positions.py
+│   ├── analyze_expansion_signals.py
+│   └── build_final_experiment_report.py
 │
 ├── requirements.txt
 ├── .env
-├── .gitignore
 └── README.md
 ```
 
-Large local assets such as models, Hugging Face caches, Defects4J checkouts, and QLoRA adapters should not be committed to Git.
+Local Defects4J checkouts and API credentials should not be committed to the
+repository.
 
 ---
 
-# 23. Environment
+# Environment
 
-The project has been developed and tested on:
+The current experiments were developed with:
 
 ```text
-macOS
-Apple Silicon
 Python 3.11
 Java 11
 Defects4J
-MLX / MLX-LM
-Qwen3.5-9B
+macOS / Apple Silicon
 ```
 
----
-
-# 24. Python Setup
-
-Create and activate a virtual environment:
+Create a Python virtual environment:
 
 ```bash
 python3.11 -m venv venv
@@ -908,506 +847,627 @@ pip install -r requirements.txt
 
 ---
 
-# 25. CAMD Environment Setup
+# LLM Configuration
 
-The local environment requires Java 11, Defects4J, Perl dependencies, and the local Hugging Face cache.
+Create a local `.env` file:
+
+```text
+.env
+```
 
 Example:
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+CAMD_MODEL=gpt-5.5
+```
+
+Do **not** commit `.env`.
+
+The LLM client is implemented in:
+
+```text
+camd/llm/client.py
+```
+
+and uses the configured model for Detector, Critic, and Judge inference.
+
+---
+
+# Java and Defects4J
+
+CAMD uses Defects4J for real-world buggy Java projects.
+
+Java 11 is required by the current local setup.
+
+Example macOS configuration:
 
 ```bash
 export JAVA_HOME="/opt/homebrew/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home"
-
-export PERL5LIB="$HOME/perl5/lib/perl5${PERL5LIB:+:$PERL5LIB}"
-
-export DEFECTS4J_HOME="/path/to/CAMD/external/defects4j"
-
-export HF_HOME="/path/to/CAMD/hf_home"
-
-export HF_HUB_OFFLINE=1
-
-export PATH="$JAVA_HOME/bin:$HOME/perl5/bin:$DEFECTS4J_HOME/framework/bin:$PATH"
+export PATH="$JAVA_HOME/bin:$PATH"
 ```
 
-The repository may also use:
+Configure Defects4J:
 
 ```bash
-source scripts/setup_env.sh
+export DEFECTS4J_HOME="$PWD/external/defects4j"
+export PATH="$DEFECTS4J_HOME/framework/bin:$PATH"
 ```
 
-to restore the local environment after opening a new terminal.
-
-Verify:
+Verify the environment:
 
 ```bash
 java -version
-```
-
-```bash
-perl -MString::Interpolate -e 'print "Perl OK\n"'
-```
-
-```bash
-which defects4j
-```
-
----
-
-# 26. Defects4J
-
-Example project information:
-
-```bash
 defects4j info -p Lang
 ```
 
-Checkout a buggy version:
-
-```bash
-defects4j checkout \
-  -p Lang \
-  -v 1b \
-  -w data/defects4j/checkouts/Lang_1b
-```
-
 ---
 
-# 27. Building the QLoRA Dataset
+# Running the Baseline
 
-Training and validation use Lang 21–65.
-
-Example:
+A small synthetic baseline batch can be executed with:
 
 ```bash
-PYTHONPATH=. python scripts/build_qlora_dataset.py \
-  --project Lang \
-  --bug-start 21 \
-  --bug-end 65 \
-  --max-negatives-per-positive 8
+PYTHONPATH=. python scripts/run_baseline_batch.py
 ```
 
-The script contains explicit protection for the held-out Lang 1–20 test set.
-
----
-
-# 28. Preparing MLX Binary Data
-
-```bash
-PYTHONPATH=. python scripts/prepare_mlx_dataset.py
-```
-
-The conversion applies token-aware context packing with a maximum sequence length of:
+Example cases include:
 
 ```text
-2048 tokens
+NullPointerExample.java
+SafeStringExample.java
+BoundaryBugExample.java
+SafeArrayExample.java
+```
+
+The baseline results are stored in:
+
+```text
+results/baseline_predictions.jsonl
 ```
 
 ---
 
-# 29. Local Qwen Conversion
+# Defects4J Benchmark
 
-A Hugging Face Qwen3.5-9B checkpoint can be converted to a local 4-bit MLX model.
+The frozen final benchmark is stored in:
+
+```text
+data/defects4j/fse_ase_benchmark_v1.json
+```
+
+The benchmark was sampled once and frozen before final evaluation.
+
+It should **not** be regenerated based on observed experimental performance.
+
+A separate retrieval-development benchmark is stored in:
+
+```text
+data/defects4j/fse_ase_retrieval_dev_v1.json
+```
+
+The development benchmark is disjoint from:
+
+- the final benchmark
+- the earlier Lang 1-20 evaluation set
+
+---
+
+# Export Frozen Candidate Pools
+
+Development candidate pools can be exported with:
+
+```bash
+PYTHONPATH=. python scripts/export_frozen_candidate_pools.py \
+  --benchmark data/defects4j/fse_ase_retrieval_dev_v1.json \
+  --output results/defects4j/fse_ase_retrieval_dev_frozen_candidate_pools.json
+```
+
+The frozen final candidate pools are stored in:
+
+```text
+results/defects4j/fse_ase_frozen_candidate_pools.json
+```
+
+Once exported for final verification, the frozen artifact should be reused
+instead of rerunning failing tests or retrieval.
+
+---
+
+# Run Detector Evaluation
+
+## Single Case
 
 Example:
 
 ```bash
-mlx_lm.convert \
-  --hf-path <LOCAL_QWEN_SNAPSHOT> \
-  --mlx-path models/qwen35_9b_4bit \
-  -q \
-  --q-bits 4
+PYTHONPATH=. python scripts/run_frozen_detector.py \
+  --manifest results/defects4j/fse_ase_retrieval_dev_frozen_candidate_pools.json \
+  --benchmark-id Lang-21 \
+  --budget 10 \
+  --include-retrieval-evidence
+```
+
+Evaluate the result:
+
+```bash
+PYTHONPATH=. python scripts/evaluate_detector_case.py \
+  --manifest results/defects4j/fse_ase_retrieval_dev_frozen_candidate_pools.json \
+  --benchmark-id Lang-21 \
+  --budget 10
 ```
 
 ---
 
-# 30. Binary QLoRA Training
+## Full Development Detector Evaluation
 
-Example final configuration:
+Run:
 
 ```bash
-mlx_lm.lora \
-  --model models/qwen35_9b_4bit \
-  --train \
-  --data data/finetuning/mlx \
-  --iters 20 \
-  --batch-size 1 \
-  --num-layers 2 \
-  --max-seq-length 2048 \
-  --grad-checkpoint \
-  --mask-prompt \
-  --learning-rate 1e-5 \
-  --adapter-path adapters/qwen35_9b_camd_qlora_balanced11_20
+PYTHONPATH=. python scripts/run_detector_dev_batch.py \
+  --budget 10
+```
+
+Evaluate:
+
+```bash
+PYTHONPATH=. python scripts/evaluate_detector_dev.py \
+  --budget 10
+```
+
+Frozen development Detector results:
+
+```text
+Top-1:  24/28 = 85.71%
+Top-3:  26/28 = 92.86%
+Top-5:  26/28 = 92.86%
+Top-10: 27/28 = 96.43%
+MRR:            0.8973
+```
+
+Conditional on candidate recall:
+
+```text
+Top-1:  24/27 = 88.89%
+Top-3:  26/27 = 96.30%
+Top-10: 27/27 = 100.00%
+Conditional MRR: 0.9306
 ```
 
 ---
 
-# 31. Pairwise Dataset
+# Run Critic + Judge Verification
 
-Build pairwise examples:
+The development verifier uses:
 
-```bash
-PYTHONPATH=. python scripts/build_pairwise_dataset.py \
-  --negatives-per-positive 4
+```text
+K_verify = 10
 ```
 
-Prepare MLX data:
+This value was frozen using the development set before held-out final
+evaluation.
+
+Run:
 
 ```bash
-PYTHONPATH=. python scripts/prepare_pairwise_mlx_dataset.py
+PYTHONPATH=. python scripts/run_verifier_dev_batch.py \
+  --budget 10 \
+  --verify-top-k 10
+```
+
+Evaluate:
+
+```bash
+PYTHONPATH=. python scripts/evaluate_verifier_dev.py \
+  --budget 10 \
+  --verify-top-k 10
+```
+
+Frozen development results:
+
+```text
+Detector Top-1: 24/28 = 85.71%
+Judge Top-1:    26/28 = 92.86%
+
+Detector MRR: 0.8973
+Judge MRR:    0.9405
+```
+
+Top-1 transitions:
+
+```text
+Corrected:        2
+Regressed:        0
+Retained correct: 24
+Retained wrong:   2
+```
+
+These development results motivated the held-out multi-agent evaluation, but
+the improvement did not generalize to the frozen final benchmark.
+
+---
+
+# Frozen Final Evaluation
+
+## Final Detector
+
+```bash
+PYTHONPATH=. python scripts/run_detector_dev_batch.py \
+  --manifest results/defects4j/fse_ase_frozen_candidate_pools.json \
+  --output-dir results/verification/final/detector \
+  --budget 10
 ```
 
 ---
 
-# 32. Pairwise QLoRA Training
+## Final Critic + Judge
 
 ```bash
-mlx_lm.lora \
-  --model models/qwen35_9b_4bit \
-  --train \
-  --data data/finetuning/pairwise_mlx \
-  --iters 20 \
-  --batch-size 1 \
-  --num-layers 2 \
-  --max-seq-length 2048 \
-  --grad-checkpoint \
-  --mask-prompt \
-  --learning-rate 1e-5 \
-  --adapter-path adapters/qwen35_9b_camd_pairwise20
+PYTHONPATH=. python scripts/run_verifier_dev_batch.py \
+  --manifest results/defects4j/fse_ase_frozen_candidate_pools.json \
+  --detector-dir results/verification/final/detector \
+  --output-dir results/verification/final/verifier \
+  --budget 10 \
+  --verify-top-k 10
 ```
 
 ---
 
-# 33. Held-Out Binary Evaluation
-
-Build the final Lang 1–20 test set:
+## Final Evaluation
 
 ```bash
-PYTHONPATH=. python scripts/build_heldout_qlora_test.py \
-  --max-negatives-per-positive 8
+PYTHONPATH=. python scripts/evaluate_verifier_dev.py \
+  --manifest results/defects4j/fse_ase_frozen_candidate_pools.json \
+  --detector-dir results/verification/final/detector \
+  --verifier-dir results/verification/final/verifier \
+  --budget 10 \
+  --verify-top-k 10 \
+  --output results/verification/final/final_verifier_summary.json
 ```
 
-Prepare MLX test data:
+Frozen held-out results:
 
-```bash
-PYTHONPATH=. python scripts/prepare_heldout_mlx_test.py
-```
+```text
+Retriever Recall@10:
+71 / 98 = 72.45%
 
-Evaluate base Qwen:
+Detector Top-1:
+67 / 98 = 68.37%
 
-```bash
-PYTHONPATH=. python scripts/evaluate_qlora.py \
-  --no-adapter \
-  --metadata data/finetuning/heldout_lang_1_20/test.jsonl \
-  --mlx-data data/finetuning/heldout_lang_1_20/mlx/test.jsonl \
-  --output results/qlora/heldout_binary_base_lang1_20.json
-```
+Judge Top-1:
+66 / 98 = 67.35%
 
-Evaluate binary QLoRA:
+Detector conditional Top-1:
+67 / 71 = 94.37%
 
-```bash
-PYTHONPATH=. python scripts/evaluate_qlora.py \
-  --adapter adapters/qwen35_9b_camd_qlora_balanced11_20 \
-  --metadata data/finetuning/heldout_lang_1_20/test.jsonl \
-  --mlx-data data/finetuning/heldout_lang_1_20/mlx/test.jsonl \
-  --output results/qlora/heldout_binary_qlora11_lang1_20.json
-```
-
-Evaluation compares the conditional log-likelihood of:
-
-```json
-{"is_target_defect": true}
-```
-
-and:
-
-```json
-{"is_target_defect": false}
-```
-
-rather than relying on unconstrained text generation.
-
----
-
-# 34. Held-Out Pairwise Evaluation
-
-Build pairwise held-out data:
-
-```bash
-PYTHONPATH=. python scripts/build_heldout_pairwise_test.py
-```
-
-Prepare MLX input:
-
-```bash
-PYTHONPATH=. python scripts/prepare_heldout_pairwise_mlx_test.py
-```
-
-Evaluate pairwise QLoRA:
-
-```bash
-PYTHONPATH=. python scripts/evaluate_pairwise_qlora.py \
-  --adapter adapters/qwen35_9b_camd_pairwise20 \
-  --metadata data/finetuning/heldout_lang_1_20/pairwise/test.jsonl \
-  --mlx-validation data/finetuning/heldout_lang_1_20/pairwise_mlx/test.jsonl \
-  --output results/qlora/heldout_pairwise20_lang1_20.json
-```
-
-Evaluate the base model:
-
-```bash
-PYTHONPATH=. python scripts/evaluate_pairwise_qlora.py \
-  --no-adapter \
-  --metadata data/finetuning/heldout_lang_1_20/pairwise/test.jsonl \
-  --mlx-validation data/finetuning/heldout_lang_1_20/pairwise_mlx/test.jsonl \
-  --output results/qlora/heldout_pairwise_base_lang1_20.json
+Judge conditional Top-1:
+66 / 71 = 92.96%
 ```
 
 ---
 
-# 35. Building the Final QLoRA Summary
+# Offline Failure Analysis
+
+The following analysis scripts do **not** call an LLM.
+
+## Final Failure Decomposition
 
 ```bash
-PYTHONPATH=. python scripts/build_qlora_final_summary.py
+PYTHONPATH=. python scripts/analyze_final_failures.py
 ```
 
 Output:
 
 ```text
-results/qlora/final_summary.json
+results/verification/final/final_failure_analysis.json
 ```
-
-This file is the canonical summary of the final held-out QLoRA experiments.
 
 ---
 
-# 36. Reproducibility
+## Candidate Recovery Analysis
 
-Important experimental rules:
+```bash
+PYTHONPATH=. python scripts/analyze_candidate_recovery.py
+```
 
-### No fixed-source leakage
-
-Fixed source code is used only to construct offline ground-truth labels.
-
-Model inference receives:
+Output:
 
 ```text
-buggy method
-+
-failing-test context
-+
-static evidence
+results/verification/final/candidate_recovery_analysis.json
 ```
-
-The fixed implementation is not included in model prompts.
-
-### Bug-level data splitting
-
-Training and validation are split by bug ID rather than by individual methods.
-
-This prevents methods from the same defect appearing in both train and validation sets.
-
-### Held-out evaluation
-
-Lang 1–20 are reserved for final testing.
-
-Once final test evaluation begins, results are not used to adjust:
-
-- prompts,
-- thresholds,
-- sampling,
-- LoRA layers,
-- training iterations,
-- ranking aggregation,
-- hyperparameters.
 
 ---
 
-# 37. Git Ignore Recommendations
+## Recovered Candidate Position Analysis
 
-Large local files should remain outside version control.
-
-Recommended `.gitignore` entries:
-
-```gitignore
-.env
-venv/
-__pycache__/
-*.pyc
-.DS_Store
-
-hf_home/
-models/
-adapters/
-
-data/defects4j/checkouts/
+```bash
+PYTHONPATH=. python scripts/analyze_recovered_candidate_positions.py
 ```
 
-Small experimental summaries under:
+Output:
 
 ```text
-results/
+results/verification/final/recovered_candidate_positions.json
 ```
-
-can be committed for reproducibility.
 
 ---
 
-# 38. Limitations
+## Expansion-Signal Analysis
 
-Current experiments have several limitations.
+```bash
+PYTHONPATH=. python scripts/analyze_expansion_signals.py
+```
 
-## Dataset Scale
-
-The primary formal evaluation currently uses only 18 valid Commons Lang bugs.
-
-Results should therefore not be interpreted as general performance across all Defects4J projects.
-
-## Model Dependence
-
-Multi-agent reasoning still depends on the behavior and calibration of the underlying LLM.
-
-## Candidate Generation
-
-If the defective method does not enter the candidate pool, later reasoning stages cannot recover it without search expansion.
-
-## Line Localization
-
-Exact-line evaluation can be sensitive to formatting and multi-line Java statements.
-
-AST-based statement evaluation partly addresses this issue.
-
-## QLoRA Scale
-
-QLoRA experiments use:
+Output:
 
 ```text
-Qwen3.5-9B
-2 trainable LoRA layers
-20 training iterations
+results/verification/final/expansion_signal_analysis.json
 ```
 
-They demonstrate that lightweight local fine-tuning can change discrimination behavior, but do not establish that larger-scale fine-tuning cannot improve localization ranking.
-
-## Hardware Constraints
-
-Experiments are designed to run locally on Apple Silicon using unified memory.
-
-This constrains batch size, trainable layers, and sequence length.
-
 ---
 
-# 39. Key Findings
+## Build Frozen Experiment Report
 
-The current experiments suggest several conclusions.
+```bash
+PYTHONPATH=. python scripts/build_final_experiment_report.py
+```
 
-### 1. Context-aware decomposition is effective
-
-Method-level decomposition substantially reduces the search space and allows targeted reasoning.
-
-### 2. Static evidence complements semantic reasoning
-
-AST-derived structural evidence provides additional information that is difficult to recover consistently from raw source text alone.
-
-### 3. Multi-agent verification improves localization reliability
-
-Detector, Critic, and Judge roles allow candidate hypotheses to be challenged before final ranking.
-
-### 4. Candidate recall remains important
-
-Lang-20 demonstrates that even a strong verifier cannot identify a method that is excluded from the candidate set.
-
-Adaptive expansion provides one mechanism for handling this failure mode.
-
-### 5. Statement-level evaluation is more informative than strict line matching
-
-Java statements frequently span multiple physical source lines.
-
-### 6. Fine-tuning and localization are not equivalent
-
-QLoRA improves binary defect sensitivity and pairwise preference quality, but these improvements do not automatically produce better global method ranking.
-
----
-
-# 40. Current Status
-
-Implemented:
+This generates:
 
 ```text
-✓ LLM-only baseline
-✓ Method extraction
-✓ Context-aware candidate ranking
-✓ Expanded failing-test context
-✓ AST-based static evidence
-✓ Detector agent
-✓ Critic agent
-✓ Judge agent
-✓ Multi-agent candidate verification
-✓ Method-level evaluation
-✓ Adaptive candidate expansion
-✓ Line-level localization
-✓ AST statement evaluation
-✓ End-to-end localization
-✓ Local Qwen3.5-9B deployment
-✓ 4-bit MLX conversion
-✓ Binary QLoRA
-✓ Pairwise QLoRA
-✓ Held-out Lang 1-20 evaluation
-✓ Final QLoRA ablation summary
+results/verification/final/camd_final_experiment_summary.json
+results/verification/final/CAMD_FINAL_RESULTS.md
 ```
 
 ---
 
-# 41. Future Work
+# Reproducibility Policy
 
-Possible extensions include:
+The project follows several rules intended to prevent accidental test-set
+tuning.
 
-- evaluation on additional Defects4J projects;
-- larger candidate pools;
-- dynamic execution traces;
-- coverage-based evidence;
-- call-graph-aware localization;
-- test-to-method dependency modeling;
-- learned candidate ranking;
-- larger-scale preference optimization;
-- multi-project QLoRA training;
-- cross-project generalization;
-- confidence calibration;
-- cost-aware adaptive search;
-- stronger line-level localization.
+## Frozen Benchmark
 
----
+The final benchmark is sampled once and is not regenerated based on observed
+performance.
 
-# 42. Research Perspective
+## Frozen Candidate Pools
 
-CAMD is based on the hypothesis that software defect localization is better treated as a **structured reasoning and evidence integration problem** than as a single unconstrained LLM prediction.
+Final Detector, Critic, and Judge experiments operate on exported frozen
+candidate pools.
 
-The current experimental results support a pipeline in which:
+The retrieval stage and failing tests are not rerun during verifier
+evaluation.
+
+## Development / Final Separation
+
+Prompt design and `K_verify` decisions use the development set.
+
+The frozen final benchmark is then used for held-out evaluation.
+
+## No Post-Hoc Final Tuning
+
+Confidence distributions and retrieval-depth patterns discovered after final
+evaluation are treated as:
 
 ```text
-LLM reasoning
-+
-program structure
-+
-test context
-+
-static evidence
-+
-multi-agent verification
-+
-adaptive search
+post-hoc failure analysis
 ```
 
-are combined to improve defect localization reliability.
+rather than evidence for a tuned final improvement.
 
-At the same time, the QLoRA experiments provide an informative negative result: improving local classification or pairwise preference behavior does not necessarily improve global localization ranking.
+## Cached LLM Outputs
 
-This distinction is important when designing learning-based defect localization systems.
+Batch runners save completed results incrementally.
+
+When an experiment is resumed, completed candidate outputs are reused rather
+than repeatedly resampled until a favorable result appears.
 
 ---
 
-# 43. Disclaimer
+# Experimental Artifacts
 
-CAMD is currently a research prototype.
+Important frozen artifacts include:
 
-The reported results are based primarily on Apache Commons Lang bugs from Defects4J and should not be interpreted as production-level defect detection performance or as evidence of generalization to arbitrary software projects.
+```text
+results/defects4j/fse_ase_final_retrieval_results.json
+results/defects4j/fse_ase_frozen_candidate_pools.json
 
-The adaptive 100% Top-1 result is reported as a preliminary robustness experiment rather than the primary CAMD result.
+results/verification/verifier_dev_summary.json
+
+results/verification/final/final_verifier_summary.json
+results/verification/final/final_failure_analysis.json
+results/verification/final/candidate_recovery_analysis.json
+results/verification/final/recovered_candidate_positions.json
+results/verification/final/expansion_signal_analysis.json
+results/verification/final/camd_final_experiment_summary.json
+results/verification/final/CAMD_FINAL_RESULTS.md
+```
+
+---
+
+# Known Limitations
+
+## Retrieval Coverage
+
+The main limitation is candidate recall.
+
+At `K=10`, only:
+
+```text
+71 / 98 = 72.45%
+```
+
+of method-applicable bugs expose at least one ground-truth method to the
+Detector.
+
+---
+
+## Expensive Exhaustive LLM Verification
+
+Increasing the candidate budget from 10 to 100 improves retrieval recall, but
+running the full LLM Detector over all 100 methods would significantly
+increase inference cost.
+
+A cheaper reranking stage is therefore a more promising direction.
+
+---
+
+## High-Confidence Retrieval Failures
+
+Some cases whose ground-truth method is absent from the candidate pool still
+receive high Detector confidence on an incorrect method.
+
+Therefore Detector confidence alone is not reliable evidence that candidate
+retrieval is complete.
+
+---
+
+## Method-Addition Bugs
+
+CAMD v1 localizes existing executable methods.
+
+Method-addition defects, where the correct method does not exist in the buggy
+revision, are currently outside the main localization scope.
+
+---
+
+## Multi-Agent Over-Verification
+
+Critic/Judge may improve individual cases, but the held-out benchmark shows no
+consistent overall improvement.
+
+Repeated deliberation over the same evidence can introduce additional ranking
+errors.
+
+---
+
+# Research Questions
+
+## RQ1
+
+How effectively can a program-wide retriever reduce an entire Java program to
+a small candidate set containing the faulty method?
+
+## RQ2
+
+Once the faulty method is retrieved, how accurately can an LLM Detector rank it
+using code, failing-test, and structural evidence?
+
+## RQ3
+
+Does multi-agent verification with Detector, Critic, and Judge improve
+localization over a strong single Detector?
+
+## RQ4
+
+Where do remaining failures originate: candidate retrieval, candidate ranking,
+or LLM verification?
+
+## RQ5
+
+Can deeper candidate pools be efficiently reranked without applying expensive
+LLM reasoning to every method?
+
+---
+
+# Current Research Direction
+
+Based on the frozen CAMD v1 results, the highest-priority next step is not to
+add more LLM agents.
+
+Instead, CAMD is moving toward:
+
+```text
+efficient candidate reranking
++
+adaptive candidate expansion
++
+better retrieval coverage
+```
+
+A key future objective is to move ground-truth methods currently ranked around:
+
+```text
+23 - 96
+```
+
+into a much smaller shortlist before expensive LLM inference.
+
+---
+
+# Status
+
+CAMD v1 currently includes:
+
+- [x] Whole-program method extraction
+- [x] Program-wide candidate retrieval
+- [x] Test / lexical retrieval signals
+- [x] Stack-based evidence augmentation
+- [x] Call-chain candidate expansion
+- [x] Defects4J integration
+- [x] Frozen multi-project benchmark
+- [x] LLM Detector
+- [x] Critic Agent
+- [x] Judge Agent
+- [x] Development / held-out evaluation
+- [x] Candidate-recall analysis
+- [x] Failure decomposition
+- [x] Candidate-depth analysis
+- [x] Post-hoc uncertainty analysis
+- [ ] Cheap Top-100 -> Top-10 reranker
+- [ ] Independently validated adaptive retrieval
+- [ ] Analysis of K=100 unresolved retrieval failures
+- [ ] Larger cross-project evaluation
+
+---
+
+# Project Name
+
+**CAMD**
+
+**Context-Aware Multi-Agent Software Defect Detection with Large Language Models**
+
+The project name reflects the broader research system, including the
+implemented multi-agent verification components.
+
+However, the frozen CAMD v1 empirical results indicate that the primary
+effective inference path is:
+
+```text
+Context-Aware Program-Wide Retrieval
+                +
+        LLM Detector
+```
+
+while Critic/Judge serves as an experimental verification ablation.
+
+---
+
+# Citation
+
+A paper citation will be added when the corresponding manuscript is available.
+
+```bibtex
+@misc{camd2026,
+  title  = {CAMD: Context-Aware Multi-Agent Software Defect Detection with Large Language Models},
+  author = {Baozan Yan},
+  year   = {2026}
+}
+```
+
+---
+
+# License
+
+A project license has not yet been finalized.
+
+If this repository is released publicly, an appropriate open-source license
+should be added before distribution.
+
+---
+
+# Contact
+
+For questions about the project, experiments, or reproducibility, please open
+an issue in this repository.
