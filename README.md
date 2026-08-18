@@ -196,6 +196,8 @@ The candidate pool is:
 $$
 \mathcal{C}_K = \operatorname{TopK}_{m_i \in \mathcal{M}_b} R(m_i, T)
 $$
+
+
 The initial retriever combines multiple signals:
 
 $$
