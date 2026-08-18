@@ -191,29 +191,15 @@ $$
 
 where $T$ denotes failing-test evidence.
 
-The candidate pool is:
-
+The candidate pool is: 
 $$
-\mathcal{C}_K
-=
-\operatorname{TopK}_{m_i \in \mathcal{M}_b}
-R(m_i, T)
+\mathcal{C}_K = \operatorname{TopK}_{m_i \in \mathcal{M}_b} R(m_i, T)
 $$
 
 The initial retriever combines multiple signals:
 
 $$
-R_i
-=
-0.35 S_{\text{direct}}
-+
-0.20 S_{\text{class}}
-+
-0.20 S_{\text{name}}
-+
-0.10 S_{\text{test-name}}
-+
-0.15 S_{\text{lexical}}
+R_i =0.35 S_{\text{direct}}+0.20 S_{\text{class}}+0.20 S_{\text{name}}+0.10 S_{\text{test-name}}+0.15 S_{\text{lexical}}
 $$
 
 These signals capture:
@@ -383,9 +369,7 @@ The Detector evaluates each retrieved method independently using:
 Conceptually:
 
 $$
-d_i
-=
-D(m_i, T, C_i, E_i)
+d_i=D(m_i, T, C_i, E_i)
 $$
 
 where:
@@ -436,22 +420,13 @@ between:
 The Critic computes:
 
 $$
-c_i
-=
-C(m_i, T, d_i)
+c_i=C(m_i, T, d_i)
 $$
 
 The Judge then considers both analyses:
 
 $$
-s_i
-=
-J(
-T,
-m_i,
-d_i,
-c_i
-)
+s_i=J(T,m_i,d_i,c_i)
 $$
 
 where:
